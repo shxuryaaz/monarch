@@ -1,0 +1,212 @@
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
+
+const DEFAULT_FETCH_MS = 120_000;
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string | undefined;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export function purchaseErrorDescription(err: unknown): string {
+  const base =
+    err instanceof ApiError
+      ? err.message
+      : err instanceof Error
+        ? err.message
+        : "Unknown error";
+  const lower = base.toLowerCase();
+  if (
+    lower.includes("replacement fee") ||
+    lower.includes("-32000") ||
+    lower.includes("underpriced") ||
+    lower.includes("fee too low")
+  ) {
+    return `${base} In your wallet, cancel or speed up any pending transaction, then try again. For local dev, use a relayer PRIVATE_KEY that is not the same account as MetaMask.`;
+  }
+  if (err instanceof ApiError && err.status === 502) {
+    return `${base} RPC or network issue — try again shortly.`;
+  }
+  if (lower.includes("timed out")) {
+    return `${base} Check your wallet and network, then try again.`;
+  }
+  return base;
+}
+
+export async function getPublicConfig() {
+  return apiFetch<{
+    chainSettlementEnabled: boolean;
+    chainId: number;
+    treasuryAddress: string;
+    mockUsdcAddress: string;
+  }>("/config");
+}
+
+export type Asset = {
+  id: string;
+  onchainAssetId: string;
+  tokenAddress: string;
+  name: string;
+  symbol: string;
+  type: string;
+  location: string;
+  tokenPriceUsd: number;
+  totalAssetValue: number;
+  availableSupply: number;
+  expectedYieldPct: number;
+  oraclePriceUsd?: number | null;
+  oracleYieldPct?: number | null;
+  riskScore?: number | null;
+  riskLabel?: string | null;
+};
+
+export async function apiFetch<T>(
+  path: string,
+  init?: RequestInit,
+  token?: string,
+  timeoutMs: number = DEFAULT_FETCH_MS
+): Promise<T> {
+  const controller = new AbortController();
+  const tid = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init?.headers ?? {})
+      }
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string; code?: string };
+      const msg =
+        typeof body.error === "string"
+          ? body.error
+          : typeof body.message === "string"
+            ? body.message
+            : `Request failed: ${res.status}`;
+      throw new ApiError(msg, res.status, typeof body.code === "string" ? body.code : undefined);
+    }
+    return (await res.json()) as T;
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new ApiError(`Request timed out after ${timeoutMs / 1000}s`, 408, "TIMEOUT");
+    }
+    throw e;
+  } finally {
+    window.clearTimeout(tid);
+  }
+}
+
+export async function getAssets() {
+  return apiFetch<{ assets: Asset[] }>("/assets");
+}
+
+export async function getAsset(id: string) {
+  return apiFetch<{ asset: Asset }>(`/assets/${encodeURIComponent(id)}`);
+}
+
+export async function getPortfolio(token: string) {
+  return apiFetch<{
+    totalInvested: number;
+    totalValue: number;
+    totalReturns: number;
+    positions: Array<{ tokenBalance: number; avgCostUsd: number; asset: Asset }>;
+  }>("/portfolio/me", undefined, token);
+}
+
+export type PurchasePayment = {
+  chainId: number;
+  usdcAddress: string;
+  treasuryAddress: string;
+  amountBaseUnits: string;
+  decimals: number;
+};
+
+export async function createPurchaseIntent(token: string, assetId: string, usdcAmount: number) {
+  return apiFetch<{
+    intent: { id: string; status: string };
+    chainSettlementRequired: boolean;
+    payment: PurchasePayment | null;
+  }>(
+    "/purchases/intent",
+    {
+      method: "POST",
+      body: JSON.stringify({ assetId, usdcAmount })
+    },
+    token,
+    DEFAULT_FETCH_MS
+  );
+}
+
+export async function confirmPurchase(token: string, intentId: string, paymentTxHash?: string) {
+  return apiFetch(
+    "/purchases/confirm",
+    {
+      method: "POST",
+      body: JSON.stringify({ intentId, paymentTxHash })
+    },
+    token,
+    DEFAULT_FETCH_MS
+  );
+}
+
+export type SaleTransfer = {
+  chainId: number;
+  assetTokenAddress: string;
+  treasuryAddress: string;
+  amountTokenBaseUnits: string;
+  tokenDecimals: number;
+  expectedUsdcOut: number;
+  expectedUsdcBaseUnits: string;
+};
+
+export async function createSaleIntent(token: string, assetId: string, tokenAmount: number) {
+  return apiFetch<{ sale: { id: string }; transfer: SaleTransfer }>("/sales/intent", {
+    method: "POST",
+    body: JSON.stringify({ assetId, tokenAmount })
+  }, token);
+}
+
+export async function settleSale(token: string, saleId: string, assetTokenTxHash: string) {
+  return apiFetch<{ sale: { id: string; status: string }; usdcPayoutTxHash: string }>("/sales/settle", {
+    method: "POST",
+    body: JSON.stringify({ saleId, assetTokenTxHash })
+  }, token);
+}
+
+export type OnchainClaimableItem = {
+  assetId: string;
+  name: string;
+  tokenAddress: string;
+  claimableBaseUnits: string;
+};
+
+export async function getOnchainClaimable(token: string) {
+  return apiFetch<{ items: OnchainClaimableItem[]; payoutDistributorAddress: string }>(
+    "/yield/onchain-claimable",
+    undefined,
+    token
+  );
+}
+
+export type PurchaseIntentRow = {
+  id: string;
+  usdcAmount: number;
+  tokenAmount: number;
+  status: string;
+  createdAt: string;
+  asset: Asset;
+};
+
+export async function getMyPurchases(token: string) {
+  return apiFetch<{ purchases: PurchaseIntentRow[] }>("/purchases/me", undefined, token);
+}

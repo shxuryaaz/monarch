@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String               @id @default(cuid())
+  wallet     String               @unique
+  createdAt  DateTime             @default(now())
+  lastLogin  DateTime?
+  isAdmin    Boolean              @default(false)
+  nonces     AuthNonce[]
+  positions  PortfolioPosition[]
+  snapshots  PortfolioSnapshot[]
+  purchases  PurchaseIntent[]
+  sales      SaleIntent[]
+  claims     YieldClaim[]
+}
+
+model AuthNonce {
+  id        String   @id @default(cuid())
+  wallet    String
+  nonce     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Asset {
+  id                String              @id @default(cuid())
+  onchainAssetId    String              @unique
+  tokenAddress      String
+  name              String
+  symbol            String
+  type              String
+  location          String
+  tokenPriceUsd     Float
+  totalAssetValue   Float
+  availableSupply   Float
+  expectedYieldPct  Float
+  oraclePriceUsd    Float?
+  oracleYieldPct    Float?
+  riskScore         Float?
+  riskLabel         String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  positions         PortfolioPosition[]
+  snapshots         PortfolioSnapshot[]
+  purchases         PurchaseIntent[]
+  saleIntents       SaleIntent[]
+  distributions     YieldDistribution[]
+}
+
+model PortfolioPosition {
+  id           String   @id @default(cuid())
+  userId       String
+  assetId      String
+  tokenBalance Float    @default(0)
+  avgCostUsd   Float    @default(0)
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+  asset        Asset    @relation(fields: [assetId], references: [id])
+
+  @@unique([userId, assetId])
+}
+
+model PortfolioSnapshot {
+  id              String   @id @default(cuid())
+  userId          String
+  assetId         String
+  portfolioValue  Float
+  investedValue   Float
+  unrealizedPnl   Float
+  riskScore       Float?
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id])
+  asset           Asset    @relation(fields: [assetId], references: [id])
+}
+
+model PurchaseIntent {
+  id             String   @id @default(cuid())
+  userId         String
+  assetId        String
+  usdcAmount     Float
+  tokenAmount    Float
+  approvalTxHash String?
+  paymentTxHash  String?
+  mintTxHash     String?
+  status         String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id])
+  asset          Asset    @relation(fields: [assetId], references: [id])
+}
+
+model SaleIntent {
+  id               String   @id @default(cuid())
+  userId           String
+  assetId          String
+  tokenAmount      Float
+  usdcOut          Float
+  status           String
+  assetTokenTxHash String?
+  usdcPayoutTxHash String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id])
+  asset            Asset    @relation(fields: [assetId], references: [id])
+}
+
+model TransactionEvent {
+  id           String   @id @default(cuid())
+  chainId      String
+  txHash       String   @unique
+  blockNumber  Int?
+  eventType    String
+  wallet       String?
+  assetAddress String?
+  amount       String?
+  metadata     String?
+  createdAt    DateTime @default(now())
+}
+
+model YieldDistribution {
+  id             String      @id @default(cuid())
+  assetId        String
+  snapshotId     Int?
+  amountUsd      Float
+  txHash         String?
+  status         String
+  createdAt      DateTime    @default(now())
+  asset          Asset       @relation(fields: [assetId], references: [id])
+  claims         YieldClaim[]
+}
+
+model YieldClaim {
+  id               String            @id @default(cuid())
+  userId           String
+  distributionId   String
+  amountUsd        Float
+  txHash           String?
+  claimedAt        DateTime          @default(now())
+  user             User              @relation(fields: [userId], references: [id])
+  distribution     YieldDistribution @relation(fields: [distributionId], references: [id])
+}

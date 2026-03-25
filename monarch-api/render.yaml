@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: monarch-api
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: DATABASE_URL
+        value: file:./dev.db
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_ORIGIN
+        value: http://localhost:8080
+      - key: SIWE_DOMAIN
+        value: localhost
+      - key: SIWE_ORIGIN
+        value: http://localhost:8080
