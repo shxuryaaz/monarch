@@ -7,13 +7,13 @@ import {
   assetTokenWeiFromHuman,
   buildApprovalPayload,
   buildMintPayload,
-  getTreasuryAddress,
   isChainSettlementEnabled,
   relayerMint,
   usdcBaseUnitsFromUsd,
   verifyErc20Transfer
 } from "../services/blockchain.service.js";
 import { chainId, contracts } from "../services/contracts.js";
+import { getPrimaryUsdcRecipient } from "../services/purchase-recipient.service.js";
 
 const router = Router();
 
@@ -57,6 +57,7 @@ router.post("/intent", requireAuth, async (req, res, next) => {
     const escrowAddr = asset.escrowContractAddress?.trim();
     const useEscrow = Boolean(chain && escrowAddr);
     const amountBaseUnits = usdcBaseUnitsFromUsd(body.usdcAmount).toString();
+    const directRecipient = await getPrimaryUsdcRecipient(body.assetId, asset.escrowContractAddress);
     const payment = chain
       ? useEscrow && escrowAddr
         ? {
@@ -72,7 +73,7 @@ router.post("/intent", requireAuth, async (req, res, next) => {
             mode: "treasury" as const,
             chainId,
             usdcAddress: contracts.MockUSDC,
-            treasuryAddress: getTreasuryAddress(),
+            treasuryAddress: directRecipient,
             amountBaseUnits,
             decimals: 6
           }
@@ -115,9 +116,7 @@ router.post("/confirm", requireAuth, async (req, res, next) => {
         return res.status(400).json({ error: "paymentTxHash is required when chain settlement is enabled" });
       }
       const expectedUnits = usdcBaseUnitsFromUsd(intent.usdcAmount);
-      const payTo =
-        intent.asset.escrowContractAddress?.trim() ??
-        getTreasuryAddress();
+      const payTo = await getPrimaryUsdcRecipient(intent.assetId, intent.asset.escrowContractAddress);
       try {
         await verifyErc20Transfer({
           txHash: body.paymentTxHash,
