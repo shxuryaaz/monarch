@@ -4,11 +4,14 @@ Backend API for Monarch (Express + TypeScript + Prisma + SQLite).
 
 ## Quick start
 
+Uses **PostgreSQL**. Set `DATABASE_URL` in `.env` (local Docker, [Neon](https://neon.tech), etc.).
+
 ```bash
 npm install
 cp .env.example .env
+# Edit .env: DATABASE_URL, JWT_SECRET, FRONTEND_ORIGIN, SIWE_*
 npm run prisma:generate
-npm run prisma:migrate -- --name init
+npx prisma migrate deploy
 npm run prisma:seed
 npm run dev
 ```
@@ -27,8 +30,8 @@ npm run dev
 
 ## Deploy (Render/Railway)
 
-- Build command: `npm run build`
+- Build command: `npm install && npx prisma generate && npx prisma migrate deploy && npm run build`
 - Start command: `npm run start`
-- Required env vars: `DATABASE_URL`, `JWT_SECRET`, `FRONTEND_ORIGIN`, `SIWE_DOMAIN`, `SIWE_ORIGIN`
+- Required env vars: `DATABASE_URL` (Postgres `postgresql://...`), `JWT_SECRET`, `FRONTEND_ORIGIN`, `SIWE_DOMAIN`, `SIWE_ORIGIN`
 
-For Render, use `render.yaml` in this folder as a starter blueprint.
+For Render, use `render.yaml` in this folder as a starter blueprint. Create a Postgres instance (or Neon) and paste its URL into `DATABASE_URL`.
