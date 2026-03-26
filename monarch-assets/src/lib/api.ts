@@ -45,6 +45,8 @@ export async function getPublicConfig() {
     chainId: number;
     treasuryAddress: string;
     mockUsdcAddress: string;
+    milestoneEscrowAddress: string | null;
+    kycMode: "stub" | "strict";
   }>("/config");
 }
 
@@ -56,15 +58,94 @@ export type Asset = {
   symbol: string;
   type: string;
   location: string;
+  description?: string | null;
   tokenPriceUsd: number;
   totalAssetValue: number;
   availableSupply: number;
+  tokensOffered: number;
+  /** 0–1 fraction of tranche still open (from API). */
+  pctRemaining?: number;
   expectedYieldPct: number;
   oraclePriceUsd?: number | null;
   oracleYieldPct?: number | null;
   riskScore?: number | null;
   riskLabel?: string | null;
+  escrowContractAddress?: string | null;
+  escrowBeneficiary?: string | null;
 };
+
+export type AssetListingRow = {
+  id: string;
+  status: string;
+  name: string;
+  symbol: string;
+  type: string;
+  location: string;
+  description?: string | null;
+  tokenPriceUsd: number;
+  totalAssetValue: number;
+  tokensOffered: number;
+  expectedYieldPct: number;
+  adminNote?: string | null;
+  createdAssetId?: string | null;
+  createdAt: string;
+  createdAsset?: Asset | null;
+};
+
+export async function createListing(
+  token: string,
+  body: {
+    name: string;
+    symbol: string;
+    type: string;
+    location: string;
+    description?: string;
+    tokenPriceUsd: number;
+    totalAssetValue: number;
+    tokensOffered: number;
+    expectedYieldPct: number;
+  }
+) {
+  return apiFetch<{ listing: AssetListingRow; asset?: Asset }>(
+    "/listings",
+    { method: "POST", body: JSON.stringify(body) },
+    token
+  );
+}
+
+export async function getMyListings(token: string) {
+  return apiFetch<{ listings: AssetListingRow[] }>("/listings/me", undefined, token);
+}
+
+export type YieldHistoryResponse = {
+  distributions: Array<{
+    id: string;
+    assetId: string;
+    amountUsd: number;
+    status: string;
+    txHash?: string | null;
+    createdAt: string;
+    asset: { id: string; name: string; tokenAddress: string };
+  }>;
+  dbClaims: Array<{
+    id: string;
+    amountUsd: number;
+    claimedAt: string;
+    txHash?: string | null;
+    distribution: {
+      id: string;
+      amountUsd: number;
+      asset: { id: string; name: string; tokenAddress: string };
+    };
+  }>;
+  onchainClaimable: OnchainClaimableItem[];
+  payoutDistributorAddress: string;
+  note?: string;
+};
+
+export async function getYieldHistory(token: string) {
+  return apiFetch<YieldHistoryResponse>("/yield/history", undefined, token);
+}
 
 export async function apiFetch<T>(
   path: string,
@@ -114,6 +195,36 @@ export async function getAsset(id: string) {
   return apiFetch<{ asset: Asset }>(`/assets/${encodeURIComponent(id)}`);
 }
 
+export type AssetTransparencyReport = {
+  asset: {
+    id: string;
+    name: string;
+    tokenAddress: string;
+    escrowContractAddress: string | null;
+    escrowBeneficiary: string | null;
+  };
+  milestones: Array<{
+    id: string;
+    sortOrder: number;
+    description: string;
+    releaseBps: number;
+    completed: boolean;
+    proofHash: string | null;
+    completedAt: string | null;
+  }>;
+  onchainEscrow: {
+    beneficiary: string | null;
+    totalDeposited: string;
+    totalReleased: string;
+    milestoneChain: Array<{ index: number; releaseBps: number; released: boolean; proofHash: string }>;
+  } | null;
+  disclosure: string;
+};
+
+export async function getAssetTransparency(assetId: string) {
+  return apiFetch<AssetTransparencyReport>(`/assets/${encodeURIComponent(assetId)}/transparency`);
+}
+
 export async function getPortfolio(token: string) {
   return apiFetch<{
     totalInvested: number;
@@ -123,13 +234,24 @@ export async function getPortfolio(token: string) {
   }>("/portfolio/me", undefined, token);
 }
 
-export type PurchasePayment = {
-  chainId: number;
-  usdcAddress: string;
-  treasuryAddress: string;
-  amountBaseUnits: string;
-  decimals: number;
-};
+export type PurchasePayment =
+  | {
+      mode: "treasury";
+      chainId: number;
+      usdcAddress: string;
+      treasuryAddress: string;
+      amountBaseUnits: string;
+      decimals: number;
+    }
+  | {
+      mode: "escrow";
+      chainId: number;
+      usdcAddress: string;
+      escrowAddress: string;
+      assetTokenAddress: string;
+      amountBaseUnits: string;
+      decimals: number;
+    };
 
 export async function createPurchaseIntent(token: string, assetId: string, usdcAmount: number) {
   return apiFetch<{
@@ -209,4 +331,17 @@ export type PurchaseIntentRow = {
 
 export async function getMyPurchases(token: string) {
   return apiFetch<{ purchases: PurchaseIntentRow[] }>("/purchases/me", undefined, token);
+}
+
+export type SaleIntentRow = {
+  id: string;
+  tokenAmount: number;
+  usdcOut: number;
+  status: string;
+  createdAt: string;
+  asset: Asset;
+};
+
+export async function getMySales(token: string) {
+  return apiFetch<{ sales: SaleIntentRow[] }>("/sales/me", undefined, token);
 }

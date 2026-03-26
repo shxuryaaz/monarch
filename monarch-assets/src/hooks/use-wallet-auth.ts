@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAccount, useConnect, useDisconnect, useSignMessage } from "wagmi";
+import { ProviderNotFoundError, useAccount, useConnect, useDisconnect, useSignMessage } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { apiFetch } from "@/lib/api";
+
+const NO_WALLET_HELP =
+  "No Ethereum wallet is available in this browser. Install MetaMask (or another Web3 wallet). If you use Incognito/private mode, allow the wallet extension for this site or use a normal window—extensions are often blocked there.";
 
 const TOKEN_KEY = "monarch_jwt";
 
@@ -39,13 +42,38 @@ export function useWalletAuth() {
     try {
       let walletAddress = address as `0x${string}` | undefined;
       if (!isConnected || !walletAddress) {
-        const connector = connectors[0];
-        if (!connector) throw new Error("No wallet connector available");
-        const result = await connectAsync({
-          connector,
-          chainId: sepolia.id
-        });
-        const first = result.accounts[0];
+        if (connectors.length === 0) {
+          throw new Error(NO_WALLET_HELP);
+        }
+        let lastError: unknown;
+        let connected: Awaited<ReturnType<typeof connectAsync>> | undefined;
+        for (const connector of connectors) {
+          try {
+            connected = await connectAsync({
+              connector,
+              chainId: sepolia.id
+            });
+            break;
+          } catch (e) {
+            lastError = e;
+            if (e instanceof ProviderNotFoundError) continue;
+            if (
+              e instanceof Error &&
+              (e.message.includes("dependency \"@metamask/connect-evm\" not found") ||
+                e.message.includes("@metamask/connect-evm"))
+            ) {
+              continue;
+            }
+            throw e;
+          }
+        }
+        if (!connected) {
+          if (lastError instanceof ProviderNotFoundError) {
+            throw new Error(NO_WALLET_HELP);
+          }
+          throw lastError instanceof Error ? lastError : new Error(NO_WALLET_HELP);
+        }
+        const first = connected.accounts[0];
         walletAddress = (typeof first === "string" ? first : first.address) as `0x${string}`;
       }
       if (!walletAddress) throw new Error("No account from wallet");

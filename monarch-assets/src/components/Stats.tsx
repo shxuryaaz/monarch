@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 const stats = [
   { value: "$280T+", label: "Real-world assets addressable" },
   { value: "24/7", label: "Always-on liquidity" },
-  { value: "150+", label: "Countries with access" },
   { value: "0%", label: "Hidden fees" },
 ];
 
@@ -11,7 +10,7 @@ const Stats = () => {
   return (
     <section className="border-t border-border px-6 py-28">
       <div className="mx-auto max-w-5xl">
-        <div className="grid grid-cols-2 gap-10 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-3">
           {stats.map((stat, i) => (
             <motion.div
               key={stat.label}

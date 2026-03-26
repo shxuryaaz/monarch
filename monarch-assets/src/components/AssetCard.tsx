@@ -1,5 +1,8 @@
+import type { ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import { SupplyMeter } from "@/components/SupplyMeter";
+import { formatTrancheLeftLabel } from "@/lib/tranche";
 
 interface AssetCardProps {
   image: string;
@@ -8,7 +11,9 @@ interface AssetCardProps {
   type: "Real Estate" | "Agriculture";
   yield_pct: string;
   tokenPrice: string;
-  supply: number; // 0-100
+  /** Fraction of tranche still available (0–1). */
+  pctRemaining: number;
+  pollKey?: number;
   index: number;
   /** Primary CTA — e.g. open marketplace or run purchase flow */
   onInvest?: () => void | Promise<void>;
@@ -17,6 +22,8 @@ interface AssetCardProps {
   investLoading?: boolean;
   /** Opens asset detail; image and title link here without nesting the Invest button */
   detailHref?: string;
+  /** Inline amount UI (e.g. collapsible slider) shown above the invest button */
+  investAmountSlot?: ReactNode;
 }
 
 const AssetCard = ({
@@ -26,13 +33,15 @@ const AssetCard = ({
   type,
   yield_pct,
   tokenPrice,
-  supply,
+  pctRemaining,
+  pollKey,
   index,
   onInvest,
   investLabel = "Invest",
   investDisabled = false,
   investLoading = false,
-  detailHref
+  detailHref,
+  investAmountSlot
 }: AssetCardProps) => {
   const title = detailHref ? (
     <Link to={detailHref} className="block text-left hover:underline hover:decoration-foreground/40">
@@ -63,8 +72,12 @@ const AssetCard = ({
     <motion.div
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
+      whileHover={{
+        y: -6,
+        boxShadow: "0 12px 40px rgba(255,255,255,0.08)"
+      }}
       transition={{ duration: 0.5, delay: index * 0.07 }}
-      className="group overflow-hidden rounded-xl border border-border surface-elevated transition-shadow duration-300 hover:shadow-[0_8px_30px_rgba(255,255,255,0.04)]"
+      className="group overflow-hidden rounded-xl border border-border surface-elevated"
     >
       {/* Image */}
       <div className="relative h-48 overflow-hidden">
@@ -94,18 +107,14 @@ const AssetCard = ({
           </div>
         </div>
 
-        {/* Supply bar */}
         <div className="mt-5">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">Available Supply</p>
-            <p className="text-xs text-muted-foreground">{supply}%</p>
+            <p className="text-xs text-muted-foreground">Tranche float</p>
+            <p className="text-xs font-medium tabular-nums text-foreground">
+              {formatTrancheLeftLabel(pctRemaining)}
+            </p>
           </div>
-          <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-foreground/50 transition-all"
-              style={{ width: `${supply}%` }}
-            />
-          </div>
+          <SupplyMeter pctRemaining={pctRemaining} className="mt-2" size="sm" pollKey={pollKey} />
         </div>
 
         {detailHref ? (
@@ -116,6 +125,8 @@ const AssetCard = ({
             View details
           </Link>
         ) : null}
+
+        {investAmountSlot ? <div className="mt-4">{investAmountSlot}</div> : null}
 
         {/* CTA */}
         <button

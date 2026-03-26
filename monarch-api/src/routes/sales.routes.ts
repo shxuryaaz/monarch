@@ -14,6 +14,20 @@ import { chainId, contracts } from "../services/contracts.js";
 
 const router = Router();
 
+router.get("/me", requireAuth, async (req, res, next) => {
+  try {
+    const sales = await prisma.saleIntent.findMany({
+      where: { userId: req.user!.sub },
+      orderBy: { createdAt: "desc" },
+      take: 25,
+      include: { asset: true }
+    });
+    res.json({ sales });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post("/intent", requireAuth, async (req, res, next) => {
   try {
     if (!isChainSettlementEnabled()) {
@@ -121,6 +135,23 @@ router.post("/settle", requireAuth, async (req, res, next) => {
         assetTokenTxHash: body.assetTokenTxHash,
         usdcPayoutTxHash: payoutTx
       }
+    });
+
+    // Return sold tokens back to available supply
+    const assetRow = await prisma.asset.findUniqueOrThrow({ where: { id: sale.assetId } });
+    const newAvailable = assetRow.availableSupply + sale.tokenAmount;
+
+    // Validate we're not exceeding total tranche size
+    if (newAvailable > assetRow.tokensOffered) {
+      throw new Error(
+        `Cannot return ${sale.tokenAmount} tokens: would result in ${newAvailable} available, ` +
+        `but only ${assetRow.tokensOffered} tokens were offered in tranche`
+      );
+    }
+
+    await prisma.asset.update({
+      where: { id: sale.assetId },
+      data: { availableSupply: newAvailable }
     });
 
     res.json({ sale: updated, usdcPayoutTxHash: payoutTx });

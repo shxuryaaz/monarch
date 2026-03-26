@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
-import { getMyPurchases } from "@/lib/api";
+import { Link, useNavigate } from "react-router-dom";
+import { getMyListings, getMyPurchases, getMySales } from "@/lib/api";
+import { MarketPulseSection } from "@/components/MarketPulseSection";
+import { DashboardYieldSection } from "@/components/DashboardYieldSection";
 import { AssetHoldingsWithSell, OnchainYieldClaims } from "@/components/DashboardOnchainPanels";
 import { useWalletAuth } from "@/hooks/use-wallet-auth";
 import { usePortfolio } from "@/hooks/use-portfolio";
@@ -29,17 +31,48 @@ const DashboardSummaryRow = ({
     <div className="flex flex-wrap items-center gap-6">
       <div className="text-right">
         <p className="text-xs text-muted-foreground">Portfolio value</p>
-        <p className="text-lg font-semibold text-foreground">{fmtUsd(totalValue)}</p>
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={totalValue}
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ duration: 0.3 }}
+            className="text-lg font-semibold text-foreground"
+          >
+            {fmtUsd(totalValue)}
+          </motion.p>
+        </AnimatePresence>
       </div>
       <div className="text-right">
         <p className="text-xs text-muted-foreground">Invested cost</p>
-        <p className="text-lg font-semibold text-foreground">{fmtUsd(totalInvested)}</p>
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={totalInvested}
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ duration: 0.3 }}
+            className="text-lg font-semibold text-foreground"
+          >
+            {fmtUsd(totalInvested)}
+          </motion.p>
+        </AnimatePresence>
       </div>
       <div className="text-right">
         <p className="text-xs text-muted-foreground">Total return</p>
-        <p className="text-lg font-semibold text-foreground">
-          {returnPct === null ? "—" : `${returnPct >= 0 ? "+" : ""}${returnPct.toFixed(2)}%`}
-        </p>
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={returnPct}
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ duration: 0.3 }}
+            className="text-lg font-semibold text-foreground"
+          >
+            {returnPct === null ? "—" : `${returnPct >= 0 ? "+" : ""}${returnPct.toFixed(2)}%`}
+          </motion.p>
+        </AnimatePresence>
       </div>
       <div className="flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-2">
         <span className="h-2 w-2 rounded-full bg-foreground opacity-40" />
@@ -103,7 +136,18 @@ function PortfolioStats({
           className="rounded-xl border border-border p-5 surface-elevated"
         >
           <p className="text-xs text-muted-foreground">{s.label}</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{s.value}</p>
+          <AnimatePresence mode="wait">
+            <motion.p
+              key={s.value}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.3 }}
+              className="mt-2 text-2xl font-semibold tracking-tight text-foreground"
+            >
+              {s.value}
+            </motion.p>
+          </AnimatePresence>
           <p className="mt-1 text-xs text-muted-foreground">{s.sub}</p>
         </motion.div>
       ))}
@@ -152,7 +196,7 @@ function PerformanceChart({ samples, returnPct }: { samples: number[]; returnPct
             {returnPct === null ? "—" : `${returnPct >= 0 ? "+" : ""}${returnPct.toFixed(2)}%`}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            One point per poll (15s). Line moves when oracle marks change; flat means value stable between ticks.
+            One point per poll (2s). Line moves when oracle marks change; flat means value stable between ticks.
           </p>
         </div>
       </div>
@@ -180,13 +224,17 @@ function PerformanceChart({ samples, returnPct }: { samples: number[]; returnPct
   );
 }
 
-function Transactions({
-  purchases,
-  loading
-}: {
-  purchases: import("@/lib/api").PurchaseIntentRow[];
-  loading: boolean;
-}) {
+type ActivityRow = {
+  key: string;
+  side: "buy" | "sell";
+  label: string;
+  assetName: string;
+  amountUsd: number;
+  status: string;
+  createdAt: string;
+};
+
+function Transactions({ activities, loading }: { activities: ActivityRow[]; loading: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -195,14 +243,15 @@ function Transactions({
       className="rounded-xl border border-border surface-elevated"
     >
       <div className="border-b border-border px-6 py-4">
-        <p className="text-sm font-medium text-foreground">Purchase activity</p>
+        <p className="text-sm font-medium text-foreground">Trading activity</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">Buys and sells recorded by the platform API</p>
       </div>
       {loading ? (
         <p className="px-6 py-8 text-sm text-muted-foreground">Loading…</p>
-      ) : purchases.length === 0 ? (
+      ) : activities.length === 0 ? (
         <div className="px-6 py-8">
           <p className="text-sm text-muted-foreground">
-            No purchase records for this wallet yet. On-chain indexers can extend this list later.
+            No buy or sell records for this wallet yet. Complete a trade on the marketplace or from an asset page.
           </p>
           <Link to="/marketplace" className="mt-3 inline-block text-sm text-foreground underline underline-offset-4">
             Go to marketplace
@@ -210,23 +259,28 @@ function Transactions({
         </div>
       ) : (
         <div className="divide-y divide-border">
-          {purchases.map((t) => {
+          {activities.map((t) => {
             const date = new Date(t.createdAt);
             const dateStr = date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
             const statusLabel = t.status.replace(/_/g, " ");
+            const isSell = t.side === "sell";
             return (
-              <div key={t.id} className="flex items-center justify-between px-6 py-4 transition-colors hover:bg-accent/50">
+              <div key={t.key} className="flex items-center justify-between px-6 py-4 transition-colors hover:bg-accent/50">
                 <div className="flex items-center gap-4">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-foreground/10 text-xs font-medium text-foreground">
-                    B
+                  <span
+                    className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium ${
+                      isSell ? "bg-amber-500/15 text-amber-200" : "bg-foreground/10 text-foreground"
+                    }`}
+                  >
+                    {isSell ? "S" : "B"}
                   </span>
                   <div>
-                    <p className="text-sm font-medium text-foreground">Buy</p>
-                    <p className="text-xs text-muted-foreground">{t.asset.name}</p>
+                    <p className="text-sm font-medium text-foreground">{t.label}</p>
+                    <p className="text-xs text-muted-foreground">{t.assetName}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-medium text-foreground">{fmtUsd(t.usdcAmount)}</p>
+                  <p className="text-sm font-medium text-foreground">{fmtUsd(t.amountUsd)}</p>
                   <p className="text-xs text-secondary-foreground">
                     {statusLabel} · {dateStr}
                   </p>
@@ -265,7 +319,7 @@ function RightPanel({
         <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
           <div className="h-full rounded-full bg-foreground/40 transition-all" style={{ width: `${riskBarPct}%` }} />
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">Weighted by current position value (demo)</p>
+        <p className="mt-2 text-xs text-muted-foreground">Weighted by current position value (model)</p>
       </motion.div>
 
       <motion.div
@@ -302,6 +356,13 @@ function RightPanel({
 
 const Dashboard = () => {
   const { token, shortAddress } = useWalletAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!token) {
+      navigate("/?login=1", { replace: true });
+    }
+  }, [token, navigate]);
   const {
     data: portfolio,
     isLoading: portfolioLoading,
@@ -313,6 +374,20 @@ const Dashboard = () => {
     queryFn: () => getMyPurchases(token!),
     enabled: !!token,
     refetchInterval: 15_000
+  });
+
+  const { data: salesData, isLoading: salesLoading } = useQuery({
+    queryKey: ["sales", token],
+    queryFn: () => getMySales(token!),
+    enabled: !!token,
+    refetchInterval: 15_000
+  });
+
+  const { data: listingsData } = useQuery({
+    queryKey: ["listings-me", token],
+    queryFn: () => getMyListings(token!),
+    enabled: !!token,
+    refetchInterval: 30_000
   });
 
   // Store samples in state (not a ref) so PerformanceChart's useMemo([samples]) sees a new array
@@ -382,6 +457,34 @@ const Dashboard = () => {
     [portfolio?.positions]
   );
 
+  const tradingActivity = useMemo((): ActivityRow[] => {
+    const purchases = purchaseData?.purchases ?? [];
+    const sales = salesData?.sales ?? [];
+    const buyRows: ActivityRow[] = purchases.map((t) => ({
+      key: `buy-${t.id}`,
+      side: "buy",
+      label: "Buy",
+      assetName: t.asset.name,
+      amountUsd: t.usdcAmount,
+      status: t.status,
+      createdAt: t.createdAt
+    }));
+    const sellRows: ActivityRow[] = sales.map((t) => ({
+      key: `sell-${t.id}`,
+      side: "sell",
+      label: "Sell",
+      assetName: t.asset.name,
+      amountUsd: t.usdcOut,
+      status: t.status,
+      createdAt: t.createdAt
+    }));
+    return [...buyRows, ...sellRows]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 40);
+  }, [purchaseData?.purchases, salesData?.sales]);
+
+  const activityLoading = purchasesLoading || salesLoading;
+
   const totalValue = portfolio?.totalValue ?? 0;
   const totalInvested = portfolio?.totalInvested ?? 0;
   const totalReturns = portfolio?.totalReturns ?? 0;
@@ -390,23 +493,50 @@ const Dashboard = () => {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-7xl px-6 py-8">
-          <p className="text-foreground">Sign in with your wallet to view your portfolio.</p>
-        </div>
+      <div className="flex min-h-[40vh] items-center justify-center bg-background px-4">
+        <p className="text-sm text-muted-foreground">Redirecting to sign in…</p>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-7xl px-6 py-8">
+      <div className="mx-auto w-full max-w-[1400px] px-4 py-8 sm:px-6 lg:px-10">
         <DashboardSummaryRow
           totalValue={totalValue}
           totalInvested={totalInvested}
           returnPct={returnPct}
           wallet={shortAddress}
         />
+
+        {(listingsData?.listings?.length ?? 0) > 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 rounded-xl border border-border bg-secondary/20 px-5 py-4"
+          >
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">My listings</p>
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {(listingsData?.listings ?? []).map((L) => (
+                <li
+                  key={L.id}
+                  className="rounded-full border border-border bg-background/80 px-3 py-1 text-xs text-foreground"
+                >
+                  <span className="font-medium">{L.name}</span>
+                  <span className="ml-2 text-muted-foreground">
+                    {L.status}
+                    {L.createdAssetId ? (
+                      <Link to={`/marketplace/${L.createdAssetId}`} className="ml-2 underline">
+                        live
+                      </Link>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        ) : null}
+
         {portfolioLoading && !portfolio ? (
           <p className="text-sm text-muted-foreground">Loading portfolio…</p>
         ) : (
@@ -423,10 +553,12 @@ const Dashboard = () => {
 
             <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_280px]">
               <div className="space-y-6">
+                <MarketPulseSection />
                 <PerformanceChart samples={samples} returnPct={returnPct} />
+                <DashboardYieldSection authToken={token} />
                 <OnchainYieldClaims authToken={token} />
                 <AssetHoldingsWithSell positions={positions} authToken={token} />
-                <Transactions purchases={purchaseData?.purchases ?? []} loading={purchasesLoading} />
+                <Transactions activities={tradingActivity} loading={activityLoading} />
               </div>
               <RightPanel allocation={allocation} riskLabel={riskLabel} riskScore={riskScore} />
             </div>

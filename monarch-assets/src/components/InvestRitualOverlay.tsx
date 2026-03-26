@@ -29,7 +29,7 @@ function phaseCopy(phase: RitualPhase, chainMode: boolean, assetName: string): {
     case "mint":
       return {
         title: chainMode ? "Minting your tokens" : "Recording investment",
-        sub: chainMode ? "Verifying payment and issuing RWA tokens" : "Saving your position (demo mode)"
+        sub: chainMode ? "Verifying payment and issuing RWA tokens" : "Recording your allocation in your account"
       };
     case "success":
       return { title: "You're in", sub: `${assetName} is now in your portfolio` };
@@ -211,6 +211,31 @@ export default function InvestRitualOverlay({
 
                 <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{title}</p>
                 <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{sub}</h2>
+
+                {/* Progress indicator */}
+                {phase !== "error" && phase !== "open" && chainMode ? (
+                  <div className="mt-6 w-full">
+                    <div className="flex items-center justify-between text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2">
+                      <span className={phase === "sign" || phase === "settle" || phase === "mint" || phase === "success" ? "text-foreground" : ""}>Sign</span>
+                      <span className={phase === "settle" || phase === "mint" || phase === "success" ? "text-foreground" : ""}>Settle</span>
+                      <span className={phase === "mint" || phase === "success" ? "text-foreground" : ""}>Mint</span>
+                      <span className={phase === "success" ? "text-foreground" : ""}>Done</span>
+                    </div>
+                    <div className="relative h-1 w-full overflow-hidden rounded-full bg-secondary">
+                      <motion.div
+                        className="absolute inset-y-0 left-0 bg-foreground"
+                        initial={{ width: "0%" }}
+                        animate={{
+                          width: phase === "sign" ? "25%" :
+                                 phase === "settle" ? "50%" :
+                                 phase === "mint" ? "75%" :
+                                 phase === "success" ? "100%" : "0%"
+                        }}
+                        transition={{ duration: 0.5, ease: "easeInOut" }}
+                      />
+                    </div>
+                  </div>
+                ) : null}
 
                 {paymentTxHash && phase !== "error" ? (
                   <a

@@ -3,14 +3,15 @@ import { useNavigate } from "react-router-dom";
 import AssetCard from "@/components/AssetCard";
 import { useAssets } from "@/hooks/use-assets";
 import { assetImageAt } from "@/lib/asset-images";
+import { tranchePctRemaining } from "@/lib/tranche";
 
 const FeaturedAssets = () => {
   const navigate = useNavigate();
-  const { data, isLoading, isError } = useAssets();
+  const { data, isLoading, isError, dataUpdatedAt } = useAssets();
   const list = (data?.assets ?? []).slice(0, 3);
 
   return (
-    <section id="featured" className="scroll-mt-28 border-t border-border px-6 py-28">
+    <section id="featured" className="scroll-mt-20 border-t border-border px-6 py-28">
       <div className="mx-auto max-w-6xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -37,10 +38,9 @@ const FeaturedAssets = () => {
 
         <div className="mt-12 flex gap-5 overflow-x-auto pb-4 scrollbar-hide">
           {list.map((a, i) => {
-            const maxAvail = Math.max(...(data?.assets ?? []).map((x) => x.availableSupply), 1);
-            const supplyPct = Math.min(100, Math.max(6, Math.round((a.availableSupply / maxAvail) * 100)));
             const mark = a.oraclePriceUsd ?? a.tokenPriceUsd;
             const yieldPct = a.oracleYieldPct ?? a.expectedYieldPct;
+            const pctRemaining = tranchePctRemaining(a);
             return (
               <div key={a.id} className="min-w-[280px] flex-shrink-0">
                 <AssetCard
@@ -50,7 +50,8 @@ const FeaturedAssets = () => {
                   type={a.type === "REAL_ESTATE" ? "Real Estate" : "Agriculture"}
                   yield_pct={`${yieldPct.toFixed(1)}%`}
                   tokenPrice={`$${mark.toFixed(2)}`}
-                  supply={supplyPct}
+                  pctRemaining={pctRemaining}
+                  pollKey={dataUpdatedAt}
                   index={i}
                   investLabel="Invest on marketplace"
                   onInvest={() => navigate("/marketplace")}

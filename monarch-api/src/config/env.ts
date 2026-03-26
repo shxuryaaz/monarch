@@ -17,7 +17,22 @@ const schema = z.object({
   ASSET_REGISTRY_ADDRESS: z.string().optional(),
   PAYOUT_DISTRIBUTOR_ADDRESS: z.string().optional(),
   /** Receives USDC for buys; defaults to deployer in contracts JSON if unset */
-  TREASURY_ADDRESS: z.string().optional()
+  TREASURY_ADDRESS: z.string().optional(),
+  /** When set, /config and treasury resolution prefer Safe (display / routing only until full Safe tx flow). */
+  TREASURY_SAFE_ADDRESS: z.string().optional(),
+  /** Optional MilestoneEscrow; overrides contracts JSON if both set */
+  MILESTONE_ESCROW_ADDRESS: z.string().optional(),
+  /** stub: allow all listings; strict: submitter must have User.kycStatus APPROVED */
+  KYC_MODE: z.enum(["stub", "strict"]).default("stub"),
+  /**
+   * When true (default), POST /listings also creates the marketplace asset so it appears immediately.
+   * Set LISTINGS_AUTO_PUBLISH=false to require POST /admin/listings/:id/approve.
+   */
+  LISTINGS_AUTO_PUBLISH: z.preprocess((val) => {
+    if (val === undefined || val === "") return true;
+    if (val === false || val === "false" || val === "0") return false;
+    return true;
+  }, z.boolean())
 });
 
 export const env = schema.parse(process.env);

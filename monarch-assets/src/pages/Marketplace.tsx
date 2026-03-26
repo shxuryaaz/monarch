@@ -1,10 +1,12 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Search } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useChainId, useSwitchChain, useWriteContract } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import AssetCard from "@/components/AssetCard";
+import { InvestAmountSelector } from "@/components/InvestAmountSelector";
+import { ParticipantAcknowledgment } from "@/components/ParticipantAcknowledgment";
 import InvestRitualOverlay from "@/components/InvestRitualOverlay";
 import { executePurchaseFlow, type RitualPhase } from "@/lib/invest-flow";
 import { getPublicConfig, purchaseErrorDescription } from "@/lib/api";
@@ -15,6 +17,11 @@ import { assetImageAt } from "@/lib/asset-images";
 import { useToast } from "@/hooks/use-toast";
 import { wagmiConfig } from "@/lib/wagmi";
 import { CONTRACTS } from "@/lib/chain";
+import { clampUsd, computeInvestBounds, usdToUsdcBaseUnits } from "@/lib/invest-amount";
+import { tranchePctRemaining } from "@/lib/tranche";
+
+const fmtInvestUsd = (n: number) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
 
 const typeFilters = ["All", "Real Estate", "Agriculture"];
 const yieldFilters = ["Any Yield", "5%+", "7%+", "9%+"];
@@ -31,6 +38,8 @@ const Marketplace = () => {
   const [typeFilter, setTypeFilter] = useState("All");
   const [yieldFilter, setYieldFilter] = useState("Any Yield");
   const [investingId, setInvestingId] = useState<string | null>(null);
+  const [participantAck, setParticipantAck] = useState(false);
+  const [investUsdById, setInvestUsdById] = useState<Record<string, number>>({});
   const [ritual, setRitual] = useState<{
     open: boolean;
     phase: RitualPhase;
@@ -38,19 +47,36 @@ const Marketplace = () => {
     tx: string | null;
     err: string | null;
   }>({ open: false, phase: "idle", name: "", tx: null, err: null });
-  const { data, refetch } = useAssets();
+  const { data, refetch, dataUpdatedAt } = useAssets();
 
   const { data: apiConfig } = useQuery({
     queryKey: ["public-config"],
     queryFn: getPublicConfig
   });
 
-  const investUsd = 100;
-  const investBaseUnits = BigInt(Math.round(investUsd * 1_000_000));
   const chainSettlement = apiConfig?.chainSettlementEnabled ?? false;
   const needsUsdc = Boolean(chainSettlement);
-  const canAfford =
-    !needsUsdc || (usdcRaw !== undefined && usdcRaw >= investBaseUnits);
+
+  useEffect(() => {
+    if (!data?.assets?.length) return;
+    setInvestUsdById((prev) => {
+      const next = { ...prev };
+      for (const a of data.assets) {
+        const b = computeInvestBounds(a);
+        if (!b.valid) {
+          delete next[a.id];
+          continue;
+        }
+        const cur = next[a.id];
+        if (cur == null || cur < b.minUsd || cur > b.maxUsd) {
+          next[a.id] = b.minUsd;
+        } else {
+          next[a.id] = clampUsd(b.minUsd, b.maxUsd, cur);
+        }
+      }
+      return next;
+    });
+  }, [data?.assets, dataUpdatedAt]);
 
   const dismissRitualError = useCallback(() => {
     setRitual((r) => ({ ...r, open: false, phase: "idle", err: null }));
@@ -61,7 +87,7 @@ const Marketplace = () => {
   }, []);
 
   const handleInvest = useCallback(
-    async (rawId: string) => {
+    async (rawId: string, investUsd: number) => {
       if (!token) {
         toast({
           title: "Sign in required",
@@ -69,7 +95,28 @@ const Marketplace = () => {
         });
         return;
       }
+      if (!participantAck) {
+        toast({
+          title: "Confirmation required",
+          description: "Please read and confirm the participant terms before you subscribe."
+        });
+        return;
+      }
       if (investingId) return;
+
+      const fullAsset = data?.assets?.find((a) => a.id === rawId);
+      const bounds = fullAsset ? computeInvestBounds(fullAsset) : null;
+      if (!bounds?.valid) {
+        toast({
+          title: "Cannot invest",
+          description: bounds && !bounds.valid ? bounds.invalidReason : "Asset not found.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const usd = clampUsd(bounds.minUsd, bounds.maxUsd, investUsd);
+      const investBaseUnits = usdToUsdcBaseUnits(usd);
 
       if (chainSettlement && chainId !== sepolia.id) {
         try {
@@ -79,16 +126,16 @@ const Marketplace = () => {
           return;
         }
       }
-      if (chainSettlement && !canAfford) {
+      if (chainSettlement && usdcRaw !== undefined && usdcRaw < investBaseUnits) {
         toast({
           title: "Insufficient USDC",
-          description: `You need at least ${investUsd} mock USDC on Sepolia. Use Test USDC in the header.`,
+          description: `You need at least $${usd.toLocaleString()} USDC on Sepolia. Use test USDC in the header.`,
           variant: "destructive"
         });
         return;
       }
 
-      const assetName = data?.assets?.find((a) => a.id === rawId)?.name ?? "Asset";
+      const assetName = fullAsset?.name ?? "Asset";
       setInvestingId(rawId);
       setRitual({ open: true, phase: "open", name: assetName, tx: null, err: null });
 
@@ -96,7 +143,7 @@ const Marketplace = () => {
         await executePurchaseFlow({
           token,
           assetId: rawId,
-          investUsd,
+          investUsd: usd,
           chainSettlement,
           writeContractAsync,
           wagmiConfig,
@@ -111,10 +158,10 @@ const Marketplace = () => {
           }
         });
         toast({
-          title: chainSettlement ? "Purchase settled on-chain" : "Investment recorded",
+          title: chainSettlement ? "Subscription settled on-chain" : "Subscription recorded",
           description: chainSettlement
-            ? "USDC transferred and RWA tokens minted via relayer."
-            : "API demo mode (no chain settlement). Configure PRIVATE_KEY + SEPOLIA_RPC_URL for real USDC flow."
+            ? "USDC received and receipt tokens issued per offering configuration."
+            : "Your allocation was recorded through the platform API. Enable chain settlement on the API for live USDC flow."
         });
 
         await refetch();
@@ -143,14 +190,12 @@ const Marketplace = () => {
       chainId,
       switchChainAsync,
       writeContractAsync,
-      canAfford,
       investingId,
+      participantAck,
       data?.assets,
-      investUsd
+      usdcRaw
     ]
   );
-
-  const maxAvail = useMemo(() => Math.max(...(data?.assets ?? []).map((a) => a.availableSupply), 1), [data?.assets]);
 
   const filtered = useMemo(() => {
     const assets = (data?.assets ?? []).map((a, i) => ({
@@ -160,13 +205,15 @@ const Marketplace = () => {
       type: a.type === "REAL_ESTATE" ? ("Real Estate" as const) : ("Agriculture" as const),
       yield_pct: `${(a.oracleYieldPct ?? a.expectedYieldPct).toFixed(1)}%`,
       tokenPrice: `$${(a.oraclePriceUsd ?? a.tokenPriceUsd).toFixed(2)}`,
-      supply: Math.min(100, Math.max(6, Math.round((a.availableSupply / maxAvail) * 100))),
+      pctRemaining: tranchePctRemaining(a),
       yieldNum: a.oracleYieldPct ?? a.expectedYieldPct,
       priceNum: a.oraclePriceUsd ?? a.tokenPriceUsd,
       rawId: a.id
     }));
     return assets.filter((a) => {
-      if (search && !a.name.toLowerCase().includes(search.toLowerCase()) && !a.location.toLowerCase().includes(search.toLowerCase()))
+      if (search && 
+          !a.name.toLowerCase().includes(search.toLowerCase()) && 
+          !a.location.toLowerCase().includes(search.toLowerCase()))
         return false;
       if (typeFilter !== "All" && a.type !== typeFilter) return false;
       if (yieldFilter === "5%+" && a.yieldNum < 5) return false;
@@ -174,7 +221,7 @@ const Marketplace = () => {
       if (yieldFilter === "9%+" && a.yieldNum < 9) return false;
       return true;
     });
-  }, [data?.assets, maxAvail, search, typeFilter, yieldFilter]);
+  }, [data?.assets, search, typeFilter, yieldFilter]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -188,7 +235,7 @@ const Marketplace = () => {
         onDismissError={dismissRitualError}
         onSuccessDone={onRitualSuccessDone}
       />
-      <div className="mx-auto max-w-7xl px-6 pb-20 pt-8">
+      <div className="mx-auto w-full max-w-[1400px] px-4 pb-20 pt-8 sm:px-6 lg:px-10">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -196,15 +243,30 @@ const Marketplace = () => {
         >
           <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">Marketplace</h1>
           <p className="mt-2 text-secondary-foreground">
-            Browse tokenized RWAs. When chain settlement is on, you send Mock USDC to the treasury, then the relayer mints AssetTokens.
+            Browse tokenized real-asset sleeves. When on-chain settlement is enabled, USDC is routed per the offering; otherwise
+            allocations are recorded through the API.
           </p>
           {chainSettlement && (
             <p className="mt-2 text-xs text-muted-foreground">
               Mock USDC: {CONTRACTS.mockUsdc} · Treasury: {apiConfig?.treasuryAddress?.slice(0, 10)}…
+              {apiConfig?.milestoneEscrowAddress ? (
+                <> · Escrow: {apiConfig.milestoneEscrowAddress.slice(0, 10)}…</>
+              ) : null}
             </p>
           )}
-          {needsUsdc && !canAfford && token && (
-            <p className="mt-2 text-sm text-amber-200/90">You need at least {investUsd} USDC on Sepolia to invest. Grab test USDC from the header.</p>
+          <div className="mt-4 max-w-3xl">
+            <ParticipantAcknowledgment
+              variant="compact"
+              requireAccept
+              accepted={participantAck}
+              onAcceptedChange={setParticipantAck}
+              idPrefix="marketplace"
+            />
+          </div>
+          {needsUsdc && token && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Fund your wallet with enough Mock USDC on Sepolia for the amount you choose on each card.
+            </p>
           )}
         </motion.div>
 
@@ -212,7 +274,7 @@ const Marketplace = () => {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="sticky top-16 z-40 mt-8 flex flex-wrap items-center gap-3 border-b border-border bg-background/80 pb-5 pt-2 backdrop-blur-xl"
+          className="sticky top-14 z-30 mt-8 flex flex-wrap items-center gap-3 border-b border-border bg-background/80 pb-5 pt-2 backdrop-blur-xl lg:top-0"
         >
           <div className="relative flex min-w-[200px] flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -221,7 +283,7 @@ const Marketplace = () => {
               placeholder="Search assets..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-      className="w-full rounded-lg border border-border bg-secondary py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full rounded-lg border border-border bg-secondary py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
 
@@ -258,25 +320,59 @@ const Marketplace = () => {
 
         {filtered.length > 0 ? (
           <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((asset, i) => (
-              <div key={asset.rawId}>
-                <AssetCard
-                  {...asset}
-                  index={i}
-                  detailHref={`/marketplace/${asset.rawId}`}
-                  investLabel={
-                    investingId === asset.rawId && isWalletWritePending
-                      ? "Waiting in wallet…"
-                      : investingId === asset.rawId
-                        ? "Processing…"
-                        : `Invest $${investUsd}`
-                  }
-                  onInvest={() => handleInvest(asset.rawId)}
-                  investLoading={investingId === asset.rawId}
-                  investDisabled={Boolean(token && needsUsdc && !canAfford)}
-                />
-              </div>
-            ))}
+            {filtered.map((asset, i) => {
+              const fullAsset = data?.assets?.find((a) => a.id === asset.rawId);
+              const bounds = fullAsset ? computeInvestBounds(fullAsset) : null;
+              const selectedUsd =
+                bounds?.valid ? (investUsdById[asset.rawId] ?? bounds.minUsd) : 0;
+              const usdForCta = bounds?.valid ? clampUsd(bounds.minUsd, bounds.maxUsd, selectedUsd) : 0;
+              const needBase = usdToUsdcBaseUnits(usdForCta);
+              const affordThis =
+                !needsUsdc || usdcRaw === undefined || usdcRaw >= needBase;
+
+              return (
+                <div key={asset.rawId}>
+                  <AssetCard
+                    {...asset}
+                    index={i}
+                    pollKey={dataUpdatedAt}
+                    detailHref={`/marketplace/${asset.rawId}`}
+                    investLabel={
+                      investingId === asset.rawId && isWalletWritePending
+                        ? "Waiting in wallet…"
+                        : investingId === asset.rawId
+                          ? "Processing…"
+                          : bounds?.valid
+                            ? `Invest ${fmtInvestUsd(usdForCta)}`
+                            : "Unavailable"
+                    }
+                    onInvest={() =>
+                      bounds?.valid ? void handleInvest(asset.rawId, usdForCta) : undefined
+                    }
+                    investLoading={investingId === asset.rawId}
+                    investDisabled={
+                      !bounds?.valid ||
+                      Boolean(token && needsUsdc && !affordThis)
+                    }
+                    investAmountSlot={
+                      bounds?.valid ? (
+                        <InvestAmountSelector
+                          bounds={bounds}
+                          valueUsd={usdForCta}
+                          onValueUsdChange={(v) =>
+                            setInvestUsdById((p) => ({ ...p, [asset.rawId]: v }))
+                          }
+                          disabled={investingId === asset.rawId}
+                          idPrefix={`mp-${asset.rawId}`}
+                        />
+                      ) : bounds && !bounds.valid ? (
+                        <p className="text-xs text-amber-200/90">{bounds.invalidReason}</p>
+                      ) : null
+                    }
+                  />
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="mt-24 text-center">

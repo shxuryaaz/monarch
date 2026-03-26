@@ -2,6 +2,7 @@ import { waitForTransactionReceipt } from "@wagmi/core";
 import type { Config } from "@wagmi/core";
 import { confirmPurchase, createPurchaseIntent } from "@/lib/api";
 import { erc20Abi } from "@/lib/chain";
+import { milestoneEscrowAbi } from "@/lib/milestone-escrow-abi";
 
 export type RitualPhase = "idle" | "open" | "sign" | "settle" | "mint" | "success" | "error";
 
@@ -49,21 +50,52 @@ export async function executePurchaseFlow(
 
   if (created.chainSettlementRequired && created.payment) {
     const pay = created.payment;
-    onPhase("sign");
-    const hash = await writeContractAsync({
-      address: pay.usdcAddress as `0x${string}`,
-      abi: erc20Abi,
-      functionName: "transfer",
-      args: [pay.treasuryAddress as `0x${string}`, BigInt(pay.amountBaseUnits)]
-    });
-    onPhase("settle", { paymentTxHash: hash });
-    await withTimeout(
-      waitForTransactionReceipt(wagmiConfig, { hash }),
-      RECEIPT_WAIT_MS,
-      "Transaction confirmation"
-    );
-    onPhase("mint");
-    await confirmPurchase(token, created.intent.id, hash);
+    let hash: `0x${string}`;
+
+    if (pay.mode === "escrow") {
+      onPhase("sign");
+      const approveHash = await writeContractAsync({
+        address: pay.usdcAddress as `0x${string}`,
+        abi: erc20Abi,
+        functionName: "approve",
+        args: [pay.escrowAddress as `0x${string}`, BigInt(pay.amountBaseUnits)]
+      });
+      await withTimeout(
+        waitForTransactionReceipt(wagmiConfig, { hash: approveHash }),
+        RECEIPT_WAIT_MS,
+        "USDC approval"
+      );
+      onPhase("settle");
+      hash = await writeContractAsync({
+        address: pay.escrowAddress as `0x${string}`,
+        abi: milestoneEscrowAbi,
+        functionName: "deposit",
+        args: [pay.assetTokenAddress as `0x${string}`, BigInt(pay.amountBaseUnits)]
+      });
+      onPhase("mint", { paymentTxHash: hash });
+      await withTimeout(
+        waitForTransactionReceipt(wagmiConfig, { hash }),
+        RECEIPT_WAIT_MS,
+        "Escrow deposit"
+      );
+      await confirmPurchase(token, created.intent.id, hash);
+    } else {
+      onPhase("sign");
+      hash = await writeContractAsync({
+        address: pay.usdcAddress as `0x${string}`,
+        abi: erc20Abi,
+        functionName: "transfer",
+        args: [pay.treasuryAddress as `0x${string}`, BigInt(pay.amountBaseUnits)]
+      });
+      onPhase("settle", { paymentTxHash: hash });
+      await withTimeout(
+        waitForTransactionReceipt(wagmiConfig, { hash }),
+        RECEIPT_WAIT_MS,
+        "Transaction confirmation"
+      );
+      onPhase("mint");
+      await confirmPurchase(token, created.intent.id, hash);
+    }
   } else {
     onPhase("mint");
     await confirmPurchase(token, created.intent.id);

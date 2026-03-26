@@ -3,10 +3,14 @@
 /* eslint-disable */
 export type { AssetRegistry } from './AssetRegistry.js';
 export type { AssetToken } from './AssetToken.js';
+export type { MilestoneEscrow } from './MilestoneEscrow.js';
 export type { MockUSDC } from './MockUSDC.js';
 export type { PayoutDistributor } from './PayoutDistributor.js';
+export type { SubscriptionReceipt } from './SubscriptionReceipt.js';
 export * as factories from './factories/index.js';
 export { AssetRegistry__factory } from './factories/AssetRegistry__factory.js';
 export { AssetToken__factory } from './factories/AssetToken__factory.js';
+export { MilestoneEscrow__factory } from './factories/MilestoneEscrow__factory.js';
 export { MockUSDC__factory } from './factories/MockUSDC__factory.js';
 export { PayoutDistributor__factory } from './factories/PayoutDistributor__factory.js';
+export { SubscriptionReceipt__factory } from './factories/SubscriptionReceipt__factory.js';

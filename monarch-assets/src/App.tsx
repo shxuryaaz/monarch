@@ -7,6 +7,7 @@ import Index from "./pages/Index.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import Marketplace from "./pages/Marketplace.tsx";
 import AssetDetail from "./pages/AssetDetail.tsx";
+import ListAsset from "./pages/ListAsset.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const App = () => (
@@ -15,11 +16,12 @@ const App = () => (
     <Sonner />
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<Index />} />
         <Route element={<AppLayout />}>
-          <Route path="/" element={<Index />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/marketplace/:assetId" element={<AssetDetail />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/list-asset" element={<ListAsset />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

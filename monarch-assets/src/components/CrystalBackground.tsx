@@ -49,14 +49,14 @@ const CrystalBackground = () => {
       v.fromBufferAttribute(pos, i); // already on sphere
       const n = v.clone().normalize();
 
-      // Pseudo "crystal noise" from position.
+      // Pseudo "crystal noise" from position - enhanced for more dramatic spikes
       const noise =
         Math.sin(n.x * 14.0 + n.y * 7.0 + n.z * 5.0) +
         Math.sin(n.x * 4.0 - n.y * 13.0 + n.z * 9.0) +
         Math.sin(n.x * 10.0 + n.y * 3.0 - n.z * 11.0);
 
       const spike = Math.pow(Math.abs(noise) / 3.0, 1.35); // 0..~1
-      const amp = 0.28 * spike;
+      const amp = 0.38 * spike; // Increased from 0.28 for more dramatic displacement
       const radius = 1.55 + amp;
 
       v.copy(n).multiplyScalar(radius);
@@ -82,6 +82,18 @@ const CrystalBackground = () => {
     const mesh = new THREE.Mesh(geometry, crystalMaterial);
     mesh.scale.set(1, 1, 1);
     scene.add(mesh);
+
+    // Add inner glow sphere for depth
+    const glowGeometry = new THREE.SphereGeometry(1.3, 32, 32);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: 0x4466ff,
+      transparent: true,
+      opacity: 0.12,
+      side: THREE.BackSide,
+      depthWrite: false
+    });
+    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+    scene.add(glowMesh);
 
     const edges = new THREE.EdgesGeometry(geometry);
     const edgeLinesMaterial = new THREE.LineBasicMaterial({
@@ -113,9 +125,9 @@ const CrystalBackground = () => {
       pointsPos[i * 3 + 1] = y;
       pointsPos[i * 3 + 2] = z;
 
-      const blueBias = Math.random();
-      // Mix between white and icy-blue.
-      const c = new THREE.Color().setRGB(1, 1, 1).lerp(new THREE.Color(0x86b7ff), blueBias);
+      // Color gradient: blue to cyan for more variety
+      const hue = (i / pointsCount) * 60 + 200; // 200-260 (blue to cyan range)
+      const c = new THREE.Color().setHSL(hue / 360, 0.75, 0.65);
       pointsColors[i * 3 + 0] = c.r;
       pointsColors[i * 3 + 1] = c.g;
       pointsColors[i * 3 + 2] = c.b;
@@ -198,6 +210,13 @@ const CrystalBackground = () => {
       mesh.position.y = floatY;
       edgeLines.position.y = floatY;
       points.position.y = floatY;
+
+      // Add subtle pulsing scale
+      const pulseScale = 1 + Math.sin(t * 0.45) * 0.04;
+      mesh.scale.setScalar(pulseScale);
+      edgeLines.scale.setScalar(pulseScale);
+      points.scale.setScalar(pulseScale);
+      glowMesh.scale.setScalar(pulseScale * 1.05);
 
       renderer.render(scene, camera);
       rafId = requestAnimationFrame(animate);

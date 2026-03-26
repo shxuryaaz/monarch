@@ -12,23 +12,31 @@ declare module "@nomicfoundation/hardhat-ethers/types" {
   interface HardhatEthersHelpers extends HardhatEthersHelpersBase {
   getContractFactory(name: 'AssetRegistry', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.AssetRegistry__factory>
 getContractFactory(name: 'AssetToken', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.AssetToken__factory>
+getContractFactory(name: 'MilestoneEscrow', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.MilestoneEscrow__factory>
 getContractFactory(name: 'MockUSDC', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.MockUSDC__factory>
 getContractFactory(name: 'PayoutDistributor', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.PayoutDistributor__factory>
+getContractFactory(name: 'SubscriptionReceipt', signerOrOptions?: ethers.Signer | FactoryOptions): Promise<Contracts.SubscriptionReceipt__factory>
 
   getContractAt(name: 'AssetRegistry', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.AssetRegistry>
 getContractAt(name: 'AssetToken', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.AssetToken>
+getContractAt(name: 'MilestoneEscrow', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.MilestoneEscrow>
 getContractAt(name: 'MockUSDC', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.MockUSDC>
 getContractAt(name: 'PayoutDistributor', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.PayoutDistributor>
+getContractAt(name: 'SubscriptionReceipt', address: string | ethers.Addressable, signer?: ethers.Signer): Promise<Contracts.SubscriptionReceipt>
 
   deployContract(name: 'AssetRegistry', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.AssetRegistry>
 deployContract(name: 'AssetToken', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.AssetToken>
+deployContract(name: 'MilestoneEscrow', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MilestoneEscrow>
 deployContract(name: 'MockUSDC', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockUSDC>
 deployContract(name: 'PayoutDistributor', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.PayoutDistributor>
+deployContract(name: 'SubscriptionReceipt', signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.SubscriptionReceipt>
 
   deployContract(name: 'AssetRegistry', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.AssetRegistry>
 deployContract(name: 'AssetToken', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.AssetToken>
+deployContract(name: 'MilestoneEscrow', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MilestoneEscrow>
 deployContract(name: 'MockUSDC', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.MockUSDC>
 deployContract(name: 'PayoutDistributor', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.PayoutDistributor>
+deployContract(name: 'SubscriptionReceipt', args: any[], signerOrOptions?: ethers.Signer | DeployContractOptions): Promise<Contracts.SubscriptionReceipt>
 
     // default types
     getContractFactory(

@@ -1,4 +1,5 @@
 import { prisma } from "../db/prisma.js";
+import { toAssetApiJson } from "../lib/asset-json.js";
 
 export async function syncPortfolioForUser(userId: string) {
   const positions = await prisma.portfolioPosition.findMany({
@@ -18,6 +19,9 @@ export async function syncPortfolioForUser(userId: string) {
     totalInvested: invested,
     totalValue: current,
     totalReturns: current - invested,
-    positions
+    positions: positions.map((p) => ({
+      ...p,
+      asset: toAssetApiJson(p.asset)
+    }))
   };
 }

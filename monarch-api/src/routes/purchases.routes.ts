@@ -35,7 +35,14 @@ router.post("/intent", requireAuth, async (req, res, next) => {
   try {
     const body = z.object({ assetId: z.string(), usdcAmount: z.number().positive() }).parse(req.body);
     const asset = await prisma.asset.findUniqueOrThrow({ where: { id: body.assetId } });
-    const tokenAmount = body.usdcAmount / asset.tokenPriceUsd;
+    const refUsd = asset.oraclePriceUsd ?? asset.tokenPriceUsd;
+    if (!Number.isFinite(refUsd) || refUsd <= 0) {
+      return res.status(400).json({ error: "Asset has no valid reference price for subscription sizing" });
+    }
+    const tokenAmount = body.usdcAmount / refUsd;
+    if (tokenAmount > asset.availableSupply + 1e-9) {
+      return res.status(400).json({ error: "Amount exceeds available tranche supply" });
+    }
     const chain = isChainSettlementEnabled();
     const intent = await prisma.purchaseIntent.create({
       data: {
@@ -47,14 +54,28 @@ router.post("/intent", requireAuth, async (req, res, next) => {
       }
     });
     const approvalPayload = await buildApprovalPayload(req.user!.wallet, contracts.PayoutDistributor, body.usdcAmount.toString());
+    const escrowAddr = asset.escrowContractAddress?.trim();
+    const useEscrow = Boolean(chain && escrowAddr);
+    const amountBaseUnits = usdcBaseUnitsFromUsd(body.usdcAmount).toString();
     const payment = chain
-      ? {
-          chainId,
-          usdcAddress: contracts.MockUSDC,
-          treasuryAddress: getTreasuryAddress(),
-          amountBaseUnits: usdcBaseUnitsFromUsd(body.usdcAmount).toString(),
-          decimals: 6
-        }
+      ? useEscrow && escrowAddr
+        ? {
+            mode: "escrow" as const,
+            chainId,
+            usdcAddress: contracts.MockUSDC,
+            escrowAddress: escrowAddr,
+            assetTokenAddress: asset.tokenAddress,
+            amountBaseUnits,
+            decimals: 6
+          }
+        : {
+            mode: "treasury" as const,
+            chainId,
+            usdcAddress: contracts.MockUSDC,
+            treasuryAddress: getTreasuryAddress(),
+            amountBaseUnits,
+            decimals: 6
+          }
       : null;
     res.status(201).json({ intent, approvalPayload, payment, chainSettlementRequired: chain });
   } catch (error) {
@@ -94,12 +115,15 @@ router.post("/confirm", requireAuth, async (req, res, next) => {
         return res.status(400).json({ error: "paymentTxHash is required when chain settlement is enabled" });
       }
       const expectedUnits = usdcBaseUnitsFromUsd(intent.usdcAmount);
+      const payTo =
+        intent.asset.escrowContractAddress?.trim() ??
+        getTreasuryAddress();
       try {
         await verifyErc20Transfer({
           txHash: body.paymentTxHash,
           tokenAddress: contracts.MockUSDC,
           expectedFrom: req.user!.wallet,
-          expectedTo: getTreasuryAddress(),
+          expectedTo: payTo,
           expectedValue: expectedUnits
         });
       } catch (e) {
@@ -128,6 +152,11 @@ router.post("/confirm", requireAuth, async (req, res, next) => {
       }
     }
 
+    const nextSupply = intent.asset.availableSupply - intent.tokenAmount;
+    if (nextSupply < -1e-9) {
+      return res.status(400).json({ error: "Tranche sold out — not enough available supply" });
+    }
+
     const updated = await prisma.purchaseIntent.update({
       where: { id: body.intentId },
       data: {
@@ -136,6 +165,11 @@ router.post("/confirm", requireAuth, async (req, res, next) => {
         mintTxHash: mintTxHash ?? undefined,
         status: "CONFIRMED"
       }
+    });
+
+    await prisma.asset.update({
+      where: { id: intent.assetId },
+      data: { availableSupply: Math.max(0, nextSupply) }
     });
 
     const payload = await buildMintPayload(req.user!.wallet, intent.asset.tokenAddress, intent.tokenAmount.toString());

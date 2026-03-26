@@ -3,7 +3,7 @@ import express from "express";
 import { env } from "./config/env.js";
 import { errorHandler } from "./middleware/error.js";
 import { getTreasuryAddress, isChainSettlementEnabled } from "./services/blockchain.service.js";
-import { chainId, contracts } from "./services/contracts.js";
+import { chainId, contracts, getMilestoneEscrowAddress } from "./services/contracts.js";
 import adminRoutes from "./routes/admin.routes.js";
 import assetsRoutes from "./routes/assets.routes.js";
 import authRoutes from "./routes/auth.routes.js";
@@ -11,6 +11,7 @@ import portfolioRoutes from "./routes/portfolio.routes.js";
 import purchasesRoutes from "./routes/purchases.routes.js";
 import salesRoutes from "./routes/sales.routes.js";
 import yieldRoutes from "./routes/yield.routes.js";
+import listingsRoutes from "./routes/listings.routes.js";
 
 export const app = express();
 
@@ -31,7 +32,9 @@ app.get("/config", (_req, res) => {
     chainSettlementEnabled: isChainSettlementEnabled(),
     chainId,
     treasuryAddress: getTreasuryAddress(),
-    mockUsdcAddress: contracts.MockUSDC
+    mockUsdcAddress: contracts.MockUSDC,
+    milestoneEscrowAddress: getMilestoneEscrowAddress() ?? null,
+    kycMode: env.KYC_MODE
   });
 });
 
@@ -42,5 +45,6 @@ app.use("/admin", adminRoutes);
 app.use("/purchases", purchasesRoutes);
 app.use("/sales", salesRoutes);
 app.use("/yield", yieldRoutes);
+app.use("/listings", listingsRoutes);
 
 app.use(errorHandler);

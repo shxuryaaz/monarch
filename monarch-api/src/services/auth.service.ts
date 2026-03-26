@@ -43,7 +43,12 @@ export async function verifyChallenge(message: string, signature: string) {
   const user = await prisma.user.upsert({
     where: { wallet },
     update: { lastLogin: new Date() },
-    create: { wallet, lastLogin: new Date(), isAdmin: false }
+    create: {
+      wallet,
+      lastLogin: new Date(),
+      isAdmin: false,
+      kycStatus: env.KYC_MODE === "strict" ? "NOT_STARTED" : "APPROVED"
+    }
   });
 
   const token = jwt.sign({ sub: user.id, wallet: user.wallet, isAdmin: user.isAdmin }, env.JWT_SECRET, {

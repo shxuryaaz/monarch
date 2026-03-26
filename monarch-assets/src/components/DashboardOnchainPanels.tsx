@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -6,106 +5,16 @@ import { useChainId, useSwitchChain, useWriteContract } from "wagmi";
 import { waitForTransactionReceipt } from "@wagmi/core";
 import { formatUnits } from "viem";
 import { sepolia } from "wagmi/chains";
-import {
-  createSaleIntent,
-  getOnchainClaimable,
-  settleSale,
-  type Asset,
-  type OnchainClaimableItem
-} from "@/lib/api";
-import { CONTRACTS, erc20Abi, payoutDistributorAbi } from "@/lib/chain";
+import { getOnchainClaimable, type Asset, type OnchainClaimableItem } from "@/lib/api";
+import { CONTRACTS, payoutDistributorAbi } from "@/lib/chain";
 import { wagmiConfig } from "@/lib/wagmi";
 import { useToast } from "@/hooks/use-toast";
+import { SellRwaPanel } from "@/components/SellRwaPanel";
 
 const fmtUsd = (n: number) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
 
 type PositionRow = { tokenBalance: number; avgCostUsd: number; asset: Asset };
-
-function SellCell({
-  position,
-  authToken,
-  onDone
-}: {
-  position: PositionRow;
-  authToken: string;
-  onDone: () => void;
-}) {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const chainId = useChainId();
-  const { switchChainAsync } = useSwitchChain();
-  const { writeContractAsync } = useWriteContract();
-  const [amount, setAmount] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const max = position.tokenBalance;
-
-  const runSell = async () => {
-    const n = Number(amount);
-    if (!Number.isFinite(n) || n <= 0 || n > max + 1e-12) {
-      toast({ title: "Invalid amount", description: `Enter up to ${max.toFixed(6)} tokens.`, variant: "destructive" });
-      return;
-    }
-    if (chainId !== sepolia.id) {
-      try {
-        await switchChainAsync?.({ chainId: sepolia.id });
-      } catch {
-        toast({ title: "Wrong network", description: "Switch to Sepolia.", variant: "destructive" });
-        return;
-      }
-    }
-    setBusy(true);
-    try {
-      const { sale, transfer } = await createSaleIntent(authToken, position.asset.id, n);
-      const hash = await writeContractAsync({
-        address: transfer.assetTokenAddress as `0x${string}`,
-        abi: erc20Abi,
-        functionName: "transfer",
-        args: [transfer.treasuryAddress as `0x${string}`, BigInt(transfer.amountTokenBaseUnits)]
-      });
-      await waitForTransactionReceipt(wagmiConfig, { hash });
-      await settleSale(authToken, sale.id, hash);
-      toast({
-        title: "Sold on-chain",
-        description: `~${fmtUsd(transfer.expectedUsdcOut)} USDC sent by relayer (check wallet).`
-      });
-      setAmount("");
-      onDone();
-      await queryClient.invalidateQueries({ queryKey: ["portfolio", authToken] });
-    } catch (e) {
-      toast({
-        title: "Sell failed",
-        description: e instanceof Error ? e.message : "Unknown error",
-        variant: "destructive"
-      });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <input
-        type="text"
-        inputMode="decimal"
-        placeholder="Amount"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        className="w-24 rounded border border-border bg-secondary px-2 py-1 text-right text-xs text-foreground"
-      />
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void runSell()}
-        className="rounded border border-border px-2 py-1 text-xs text-foreground hover:bg-accent disabled:opacity-50"
-      >
-        {busy ? "…" : "Sell"}
-      </button>
-      <p className="max-w-[140px] text-[10px] text-muted-foreground">Sepolia + relayer only</p>
-    </div>
-  );
-}
 
 export function AssetHoldingsWithSell({
   positions,
@@ -175,10 +84,17 @@ export function AssetHoldingsWithSell({
                       {fmtUsd(pnl)}
                     </td>
                     <td className="px-6 py-4">
-                      <SellCell
-                        position={p}
+                      <SellRwaPanel
+                        asset={p.asset}
+                        tokenBalance={p.tokenBalance}
                         authToken={authToken}
-                        onDone={() => void queryClient.invalidateQueries({ queryKey: ["portfolio", authToken] })}
+                        variant="compact"
+                        onDone={() =>
+                          void Promise.all([
+                            queryClient.invalidateQueries({ queryKey: ["portfolio", authToken] }),
+                            queryClient.invalidateQueries({ queryKey: ["sales", authToken] })
+                          ])
+                        }
                       />
                     </td>
                   </tr>

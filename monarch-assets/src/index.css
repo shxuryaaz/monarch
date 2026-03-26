@@ -63,6 +63,14 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
+
+  /*
+   * Leaflet + Tailwind: preflight’s img { max-width: 100% } breaks tile positioning,
+   * which produces a grey map with only markers/controls visible.
+   */
+  .leaflet-container img {
+    max-width: none !important;
+  }
 }
 
 @layer utilities {
