@@ -86,7 +86,7 @@ export function SellRwaPanel({
       <div>
         <p className="text-sm font-semibold text-foreground">Sell from this position</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Transfer RWA tokens to treasury; relayer sends mock USDC. Balance:{" "}
+          Transfer RWA tokens to the secondary settlement pool; relayer sends mock USDC. Balance:{" "}
           <span className="font-medium text-foreground">{max.toFixed(4)}</span> tokens
         </p>
       </div>

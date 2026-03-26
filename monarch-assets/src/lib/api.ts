@@ -43,6 +43,9 @@ export async function getPublicConfig() {
   return apiFetch<{
     chainSettlementEnabled: boolean;
     chainId: number;
+    /** Secondary-market RWA sink (sells). */
+    secondaryTreasuryAddress: string;
+    /** @deprecated Same as secondaryTreasuryAddress */
     treasuryAddress: string;
     mockUsdcAddress: string;
     milestoneEscrowAddress: string | null;
@@ -284,6 +287,9 @@ export async function confirmPurchase(token: string, intentId: string, paymentTx
 export type SaleTransfer = {
   chainId: number;
   assetTokenAddress: string;
+  /** Where RWA tokens go on sell (secondary pool). */
+  secondaryTreasuryAddress: string;
+  /** @deprecated Same as secondaryTreasuryAddress */
   treasuryAddress: string;
   amountTokenBaseUnits: string;
   tokenDecimals: number;

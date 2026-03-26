@@ -34,7 +34,8 @@ export function AssetHoldingsWithSell({
       <div className="border-b border-border px-6 py-4">
         <p className="text-sm font-medium text-foreground">Asset holdings</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Sell transfers RWA tokens to treasury {CONTRACTS.treasury.slice(0, 8)}… — API relayer pays Mock USDC.
+          Sell transfers RWA tokens to the secondary pool {CONTRACTS.secondaryTreasury.slice(0, 8)}… — API relayer
+          pays Mock USDC.
         </p>
       </div>
       <div className="overflow-x-auto">

@@ -1,4 +1,6 @@
 import { PrismaClient } from "@prisma/client";
+import deployed from "../../monarch-contracts/deployed-addresses.json" with { type: "json" };
+import { env } from "../src/config/env.js";
 
 const prisma = new PrismaClient();
 
@@ -77,13 +79,16 @@ async function main() {
   ];
 
   const escrowAddr = process.env.MILESTONE_ESCROW_ADDRESS?.trim();
-  const ben = process.env.TREASURY_ADDRESS?.trim();
+  /** Primary USDC for seed catalog rows — issuer wallet only (see PRIMARY_ISSUER_ADDRESS, not secondary treasury). */
+  const issuerPayout = env.PRIMARY_ISSUER_ADDRESS?.trim() || deployed.deployer;
 
   for (const asset of assets) {
-    const extra =
-      escrowAddr && asset.onchainAssetId === "napa-vineyard-01"
-        ? { escrowContractAddress: escrowAddr, escrowBeneficiary: ben ?? null }
-        : {};
+    const extra: { escrowContractAddress?: string; escrowBeneficiary?: string | null } = {
+      escrowBeneficiary: issuerPayout ?? null
+    };
+    if (escrowAddr && asset.onchainAssetId === "napa-vineyard-01") {
+      extra.escrowContractAddress = escrowAddr;
+    }
     await prisma.asset.upsert({
       where: { onchainAssetId: asset.onchainAssetId },
       update: { ...asset, ...extra },

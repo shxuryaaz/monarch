@@ -23,7 +23,7 @@ function phaseCopy(phase: RitualPhase, chainMode: boolean, assetName: string): {
     case "open":
       return { title: "Tokenizing", sub: assetName };
     case "sign":
-      return { title: "Confirm in wallet", sub: "Approve the USDC transfer to the treasury" };
+      return { title: "Confirm in wallet", sub: "Approve the USDC transfer to the offering issuer" };
     case "settle":
       return { title: "Payment settling", sub: `On-chain (chain ${SEPOLIA_CHAIN_ID})` };
     case "mint":
@@ -111,7 +111,7 @@ export default function InvestRitualOverlay({
                   className="relative mb-8 flex h-36 w-full items-center justify-center"
                   initial={false}
                 >
-                  {/* Wallet → treasury path */}
+                  {/* Wallet → issuer / escrow path */}
                   {chainMode && phase !== "open" && phase !== "error" ? (
                     <svg
                       className="absolute inset-0 h-full w-full text-border"
@@ -150,7 +150,7 @@ export default function InvestRitualOverlay({
                     <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-secondary shadow-sm">
                       <Landmark className="h-6 w-6 text-foreground" />
                     </div>
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Treasury</span>
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Issuer</span>
                   </div>
 
                   {showFlyingCoin ? (

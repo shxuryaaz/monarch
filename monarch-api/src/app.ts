@@ -2,7 +2,7 @@ import cors from "cors";
 import express from "express";
 import { env } from "./config/env.js";
 import { errorHandler } from "./middleware/error.js";
-import { getTreasuryAddress, isChainSettlementEnabled } from "./services/blockchain.service.js";
+import { getSecondaryTreasuryAddress, isChainSettlementEnabled } from "./services/blockchain.service.js";
 import { chainId, contracts, getMilestoneEscrowAddress } from "./services/contracts.js";
 import adminRoutes from "./routes/admin.routes.js";
 import assetsRoutes from "./routes/assets.routes.js";
@@ -28,10 +28,14 @@ app.get("/health", (_req, res) => {
 });
 
 app.get("/config", (_req, res) => {
+  const secondaryTreasury = getSecondaryTreasuryAddress();
   res.json({
     chainSettlementEnabled: isChainSettlementEnabled(),
     chainId,
-    treasuryAddress: getTreasuryAddress(),
+    /** Secondary-market token sink + settlement anchor (sells). */
+    secondaryTreasuryAddress: secondaryTreasury,
+    /** @deprecated Same as secondaryTreasuryAddress — kept for older clients. */
+    treasuryAddress: secondaryTreasury,
     mockUsdcAddress: contracts.MockUSDC,
     milestoneEscrowAddress: getMilestoneEscrowAddress() ?? null,
     kycMode: env.KYC_MODE

@@ -18,6 +18,12 @@ export async function publishSubmittedListing(listingId: string): Promise<Asset>
 
   await assertSubmitterKycForApproval(listing.submitterId);
 
+  const submitter = await prisma.user.findUnique({
+    where: { id: listing.submitterId },
+    select: { wallet: true }
+  });
+  const issuerWallet = submitter?.wallet?.trim();
+
   const onchainAssetId = `listing-${listing.id}`;
   const tokenAddress = defaultListingTokenAddress();
 
@@ -33,7 +39,8 @@ export async function publishSubmittedListing(listingId: string): Promise<Asset>
     totalAssetValue: listing.totalAssetValue,
     availableSupply: listing.tokensOffered,
     tokensOffered: listing.tokensOffered,
-    expectedYieldPct: listing.expectedYieldPct
+    expectedYieldPct: listing.expectedYieldPct,
+    escrowBeneficiary: issuerWallet ?? undefined
   });
 
   await prisma.assetListing.update({

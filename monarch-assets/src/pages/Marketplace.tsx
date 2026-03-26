@@ -248,7 +248,8 @@ const Marketplace = () => {
           </p>
           {chainSettlement && (
             <p className="mt-2 text-xs text-muted-foreground">
-              Mock USDC: {CONTRACTS.mockUsdc} · Treasury: {apiConfig?.treasuryAddress?.slice(0, 10)}…
+              Mock USDC: {CONTRACTS.mockUsdc} · Secondary pool:{" "}
+              {(apiConfig?.secondaryTreasuryAddress ?? apiConfig?.treasuryAddress)?.slice(0, 10)}…
               {apiConfig?.milestoneEscrowAddress ? (
                 <> · Escrow: {apiConfig.milestoneEscrowAddress.slice(0, 10)}…</>
               ) : null}

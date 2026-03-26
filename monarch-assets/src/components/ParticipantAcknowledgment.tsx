@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 
 const POINTS = [
   "In-app metrics summarize the offering; binding terms, eligibility, and risk factors live in the issuer’s offering documents (e.g. PPM or subscription agreement).",
-  "Settlement follows this sleeve’s configuration—treasury path, optional milestone escrow, and chain vs API mode—as shown on the asset page.",
+  "Settlement follows this sleeve’s configuration—direct USDC to issuer / escrow / listing wallet for primary, secondary pool for resales, optional milestone escrow, and chain vs API mode—as shown on the asset page.",
   "You remain responsible for wallet custody, network fees, and your own tax reporting."
 ];
 

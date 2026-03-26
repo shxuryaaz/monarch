@@ -16,10 +16,17 @@ const schema = z.object({
   MOCK_USDC_ADDRESS: z.string().optional(),
   ASSET_REGISTRY_ADDRESS: z.string().optional(),
   PAYOUT_DISTRIBUTOR_ADDRESS: z.string().optional(),
-  /** Receives USDC for buys; defaults to deployer in contracts JSON if unset */
+  /**
+   * Wallet that receives RWA tokens on **secondary sells**; relayer pays the seller USDC.
+   * Prefer this over TREASURY_ADDRESS (legacy alias).
+   */
+  SECONDARY_TREASURY_ADDRESS: z.string().optional(),
+  /** @deprecated Use SECONDARY_TREASURY_ADDRESS — kept as fallback for existing .env files */
   TREASURY_ADDRESS: z.string().optional(),
-  /** When set, /config and treasury resolution prefer Safe (display / routing only until full Safe tx flow). */
+  /** Safe shown for secondary routing when set (display / routing only until full Safe tx flow). */
   TREASURY_SAFE_ADDRESS: z.string().optional(),
+  /** Wallet receiving primary subscription USDC for **seed/catalog** assets (admin rows without a lister). */
+  PRIMARY_ISSUER_ADDRESS: z.string().optional(),
   /** Optional MilestoneEscrow; overrides contracts JSON if both set */
   MILESTONE_ESCROW_ADDRESS: z.string().optional(),
   /** stub: allow all listings; strict: submitter must have User.kycStatus APPROVED */

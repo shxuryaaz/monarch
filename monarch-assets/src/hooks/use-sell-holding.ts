@@ -55,13 +55,14 @@ export function useSellHolding({
       onPhase?.("sign");
       toast({
         title: "Confirm in your wallet",
-        description: "Approve the RWA token transfer to the treasury."
+        description: "Approve the RWA token transfer to the secondary settlement pool."
       });
+      const toPool = (transfer.secondaryTreasuryAddress ?? transfer.treasuryAddress) as `0x${string}`;
       const hash = await writeContractAsync({
         address: transfer.assetTokenAddress as `0x${string}`,
         abi: erc20Abi,
         functionName: "transfer",
-        args: [transfer.treasuryAddress as `0x${string}`, BigInt(transfer.amountTokenBaseUnits)]
+        args: [toPool, BigInt(transfer.amountTokenBaseUnits)]
       });
       onPhase?.("settle", { transferTxHash: hash });
       await waitForTransactionReceipt(wagmiConfig, { hash });

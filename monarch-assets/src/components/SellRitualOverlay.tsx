@@ -24,7 +24,7 @@ function phaseCopy(phase: SellRitualPhase, chainMode: boolean, assetName: string
     case "open":
       return { title: "Preparing exit", sub: assetName };
     case "sign":
-      return { title: "Confirm in wallet", sub: "Send RWA tokens to the treasury" };
+      return { title: "Confirm in wallet", sub: "Send RWA tokens to the secondary settlement pool" };
     case "settle":
       return { title: "Transfer settling", sub: `On-chain (chain ${SEPOLIA_CHAIN_ID})` };
     case "payout":
@@ -152,7 +152,7 @@ export default function SellRitualOverlay({
                     <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-secondary shadow-sm">
                       <Landmark className="h-6 w-6 text-foreground" />
                     </div>
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Treasury</span>
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Pool</span>
                   </div>
 
                   {showRwaToTreasury ? (
@@ -307,7 +307,7 @@ export default function SellRitualOverlay({
                 {phase === "settle" || phase === "payout" ? (
                   <div className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
                     <ArrowLeftRight className="h-4 w-4" />
-                    Tokens to treasury, then USDC back to you
+                    Tokens to secondary pool, then USDC back to you
                   </div>
                 ) : null}
 

@@ -2,12 +2,21 @@
 
 export const SEPOLIA_CHAIN_ID = 11155111;
 
+/**
+ * Secondary-market pool: RWA **sells** send tokens here (primary buy recipient comes from API).
+ * Override with VITE_SECONDARY_TREASURY_ADDRESS or legacy VITE_TREASURY_ADDRESS.
+ */
+const secondaryTreasuryResolved = (import.meta.env.VITE_SECONDARY_TREASURY_ADDRESS ??
+  import.meta.env.VITE_TREASURY_ADDRESS ??
+  "0xF11Be4cd94AAfE40A1d08B9842F351A60600Ab86") as `0x${string}`;
+
 export const CONTRACTS = {
   mockUsdc: (import.meta.env.VITE_MOCK_USDC_ADDRESS ?? "0x52f3E714cff72DB398F70E9E607B15105b5F2302") as `0x${string}`,
   payoutDistributor: (import.meta.env.VITE_PAYOUT_DISTRIBUTOR_ADDRESS ??
     "0xff82ffF721997a4095Ed7f07d7232167C76d4dD8") as `0x${string}`,
-  /** Receives USDC (buy) and RWA tokens (sell); default deployer */
-  treasury: (import.meta.env.VITE_TREASURY_ADDRESS ?? "0xF11Be4cd94AAfE40A1d08B9842F351A60600Ab86") as `0x${string}`
+  secondaryTreasury: secondaryTreasuryResolved,
+  /** @deprecated Alias of secondaryTreasury */
+  treasury: secondaryTreasuryResolved
 } as const;
 
 export const erc20Abi = [

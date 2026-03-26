@@ -24,7 +24,8 @@ router.post("/assets", requireAuth, requireAdmin, async (req, res, next) => {
         totalAssetValue: z.number(),
         availableSupply: z.number(),
         tokensOffered: z.number().optional(),
-        expectedYieldPct: z.number()
+        expectedYieldPct: z.number(),
+        escrowBeneficiary: z.string().optional()
       })
       .parse(req.body);
 
@@ -41,7 +42,8 @@ router.post("/assets", requireAuth, requireAdmin, async (req, res, next) => {
       totalAssetValue: body.totalAssetValue,
       availableSupply: body.availableSupply,
       tokensOffered,
-      expectedYieldPct: body.expectedYieldPct
+      expectedYieldPct: body.expectedYieldPct,
+      escrowBeneficiary: body.escrowBeneficiary
     });
     res.status(201).json(toAssetApiJson(asset));
   } catch (error) {

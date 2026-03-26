@@ -659,7 +659,8 @@ export default function AssetDetail() {
                   </p>
                 ) : (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Primary flow may route to treasury until an escrow contract is linked for this offering.
+                    Primary flow routes USDC to the issuer or listing wallet (not the resale pool) until an escrow
+                    contract is linked for this offering.
                   </p>
                 )}
                 {transparency.onchainEscrow ? (

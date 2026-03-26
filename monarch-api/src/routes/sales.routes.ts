@@ -4,7 +4,7 @@ import { prisma } from "../db/prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import {
   assetTokenWeiFromHuman,
-  getTreasuryAddress,
+  getSecondaryTreasuryAddress,
   isChainSettlementEnabled,
   relayerUsdcTransfer,
   usdcBaseUnitsFromUsd,
@@ -64,10 +64,14 @@ router.post("/intent", requireAuth, async (req, res, next) => {
     });
 
     const tokenWei = assetTokenWeiFromHuman(body.tokenAmount);
+    const secondaryTreasury = getSecondaryTreasuryAddress();
     const transfer = {
       chainId,
       assetTokenAddress: position.asset.tokenAddress,
-      treasuryAddress: getTreasuryAddress(),
+      /** Secondary pool: tokens are sent here on sell. */
+      secondaryTreasuryAddress: secondaryTreasury,
+      /** @deprecated Same as secondaryTreasuryAddress */
+      treasuryAddress: secondaryTreasury,
       amountTokenBaseUnits: tokenWei.toString(),
       tokenDecimals: 18,
       expectedUsdcOut: usdcOut,
@@ -104,7 +108,7 @@ router.post("/settle", requireAuth, async (req, res, next) => {
       txHash: body.assetTokenTxHash,
       tokenAddress: sale.asset.tokenAddress,
       expectedFrom: req.user!.wallet,
-      expectedTo: getTreasuryAddress(),
+      expectedTo: getSecondaryTreasuryAddress(),
       expectedValue: tokenWei
     });
 

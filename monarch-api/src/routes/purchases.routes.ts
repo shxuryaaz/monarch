@@ -5,7 +5,6 @@ import { requireAuth } from "../middleware/auth.js";
 import { HttpError } from "../lib/http-error.js";
 import {
   assetTokenWeiFromHuman,
-  buildApprovalPayload,
   buildMintPayload,
   isChainSettlementEnabled,
   relayerMint,
@@ -44,6 +43,22 @@ router.post("/intent", requireAuth, async (req, res, next) => {
       return res.status(400).json({ error: "Amount exceeds available tranche supply" });
     }
     const chain = isChainSettlementEnabled();
+    const escrowAddr = asset.escrowContractAddress?.trim();
+    const useEscrow = Boolean(chain && escrowAddr);
+    const amountBaseUnits = usdcBaseUnitsFromUsd(body.usdcAmount).toString();
+    let directRecipient = "";
+    if (chain && !useEscrow) {
+      try {
+        directRecipient = await getPrimaryUsdcRecipient(
+          body.assetId,
+          asset.escrowContractAddress,
+          asset.escrowBeneficiary
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Payment routing failed";
+        return res.status(400).json({ error: msg });
+      }
+    }
     const intent = await prisma.purchaseIntent.create({
       data: {
         userId: req.user!.sub,
@@ -53,11 +68,6 @@ router.post("/intent", requireAuth, async (req, res, next) => {
         status: chain ? "PENDING_PAYMENT" : "PENDING_APPROVAL"
       }
     });
-    const approvalPayload = await buildApprovalPayload(req.user!.wallet, contracts.PayoutDistributor, body.usdcAmount.toString());
-    const escrowAddr = asset.escrowContractAddress?.trim();
-    const useEscrow = Boolean(chain && escrowAddr);
-    const amountBaseUnits = usdcBaseUnitsFromUsd(body.usdcAmount).toString();
-    const directRecipient = await getPrimaryUsdcRecipient(body.assetId, asset.escrowContractAddress);
     const payment = chain
       ? useEscrow && escrowAddr
         ? {
@@ -78,7 +88,7 @@ router.post("/intent", requireAuth, async (req, res, next) => {
             decimals: 6
           }
       : null;
-    res.status(201).json({ intent, approvalPayload, payment, chainSettlementRequired: chain });
+    res.status(201).json({ intent, payment, chainSettlementRequired: chain });
   } catch (error) {
     next(error);
   }
@@ -116,7 +126,17 @@ router.post("/confirm", requireAuth, async (req, res, next) => {
         return res.status(400).json({ error: "paymentTxHash is required when chain settlement is enabled" });
       }
       const expectedUnits = usdcBaseUnitsFromUsd(intent.usdcAmount);
-      const payTo = await getPrimaryUsdcRecipient(intent.assetId, intent.asset.escrowContractAddress);
+      let payTo: string;
+      try {
+        payTo = await getPrimaryUsdcRecipient(
+          intent.assetId,
+          intent.asset.escrowContractAddress,
+          intent.asset.escrowBeneficiary
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Payment verification routing failed";
+        throw new HttpError(400, msg, "PAYMENT_ROUTE_INVALID");
+      }
       try {
         await verifyErc20Transfer({
           txHash: body.paymentTxHash,

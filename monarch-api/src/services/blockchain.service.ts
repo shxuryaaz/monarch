@@ -20,9 +20,22 @@ const PAYOUT_DISTRIBUTOR_ABI = [
   "function getDistribution(address assetToken, uint256 index) view returns (tuple(uint256 snapshotId,uint256 totalAmount,uint256 amountPerToken,uint256 timestamp,bool finalized))"
 ];
 
-export function getTreasuryAddress(): string {
-  const raw = env.TREASURY_SAFE_ADDRESS ?? env.TREASURY_ADDRESS ?? deployed.deployer;
+/**
+ * Pool for **secondary (sell) flow** only: investors transfer RWA tokens here; relayer pays them Mock USDC.
+ * Not used for primary subscriptions (those go to issuer / escrow).
+ */
+export function getSecondaryTreasuryAddress(): string {
+  const raw =
+    env.SECONDARY_TREASURY_ADDRESS ??
+    env.TREASURY_ADDRESS ??
+    env.TREASURY_SAFE_ADDRESS ??
+    deployed.deployer;
   return raw.toLowerCase();
+}
+
+/** @deprecated Use getSecondaryTreasuryAddress — kept for call sites not yet renamed. */
+export function getTreasuryAddress(): string {
+  return getSecondaryTreasuryAddress();
 }
 
 export function isChainSettlementEnabled(): boolean {
