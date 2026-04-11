@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: monarch-api
+    env: node
+    plan: free
+    buildCommand: npm install && npx prisma generate && npx prisma migrate deploy && npm run build
+    startCommand: npm run start
+    envVars:
+      # Set in Render dashboard: Neon/Supabase Postgres connection string (postgresql://...)
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_ORIGIN
+        value: http://localhost:8080
+      - key: SIWE_DOMAIN
+        value: localhost
+      - key: SIWE_ORIGIN
+        value: http://localhost:8080

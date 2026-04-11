@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm install --prefix monarch-assets && npm run build --prefix monarch-assets",
+  "outputDirectory": "monarch-assets/dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}

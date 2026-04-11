@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String               @id @default(cuid())
+  wallet        String               @unique
+  createdAt     DateTime             @default(now())
+  lastLogin     DateTime?
+  isAdmin       Boolean              @default(false)
+  /** NOT_STARTED | PENDING | APPROVED | REJECTED — gate listings when KYC_MODE=strict */
+  kycStatus     String               @default("APPROVED")
+  nonces        AuthNonce[]
+  positions     PortfolioPosition[]
+  snapshots     PortfolioSnapshot[]
+  purchases     PurchaseIntent[]
+  sales         SaleIntent[]
+  claims        YieldClaim[]
+  assetListings AssetListing[]
+}
+
+model AuthNonce {
+  id        String   @id @default(cuid())
+  wallet    String
+  nonce     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Asset {
+  id                String              @id @default(cuid())
+  onchainAssetId    String              @unique
+  tokenAddress      String
+  name              String
+  symbol            String
+  type              String
+  location          String
+  /** Long-form offering copy for detail pages */
+  description       String?
+  tokenPriceUsd     Float
+  totalAssetValue   Float
+  /** Tokens still open in the primary tranche (unsold float) */
+  availableSupply   Float
+  /** Total tranche size for %-remaining visuals */
+  tokensOffered     Float
+  expectedYieldPct  Float
+  oraclePriceUsd    Float?
+  oracleYieldPct    Float?
+  riskScore         Float?
+  riskLabel         String?
+  /** On-chain MilestoneEscrow; when set, primary USDC funds this contract */
+  escrowContractAddress String?
+  /** Wallet that receives milestone releases from escrow */
+  escrowBeneficiary     String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  positions         PortfolioPosition[]
+  escrowMilestones EscrowMilestone[]
+  snapshots         PortfolioSnapshot[]
+  purchases         PurchaseIntent[]
+  saleIntents       SaleIntent[]
+  distributions     YieldDistribution[]
+  listingOrigin     AssetListing?
+}
+
+model EscrowMilestone {
+  id          String    @id @default(cuid())
+  assetId     String
+  sortOrder   Int
+  description String
+  /** Basis points of deposited pool (all milestones sum to 10000) */
+  releaseBps  Int
+  completed   Boolean   @default(false)
+  proofHash   String?
+  completedAt DateTime?
+  asset       Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, sortOrder])
+}
+
+/** User-submitted offering; becomes an Asset after admin approval. */
+model AssetListing {
+  id               String   @id @default(cuid())
+  submitterId      String
+  status           String
+  name             String
+  symbol           String
+  type             String
+  location         String
+  description      String?
+  tokenPriceUsd    Float
+  totalAssetValue  Float
+  tokensOffered    Float
+  expectedYieldPct Float
+  adminNote        String?
+  createdAssetId   String?  @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  submitter        User     @relation(fields: [submitterId], references: [id])
+  createdAsset     Asset?   @relation(fields: [createdAssetId], references: [id])
+}
+
+model PortfolioPosition {
+  id           String   @id @default(cuid())
+  userId       String
+  assetId      String
+  tokenBalance Float    @default(0)
+  avgCostUsd   Float    @default(0)
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+  asset        Asset    @relation(fields: [assetId], references: [id])
+
+  @@unique([userId, assetId])
+}
+
+model PortfolioSnapshot {
+  id              String   @id @default(cuid())
+  userId          String
+  assetId         String
+  portfolioValue  Float
+  investedValue   Float
+  unrealizedPnl   Float
+  riskScore       Float?
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id])
+  asset           Asset    @relation(fields: [assetId], references: [id])
+}
+
+model PurchaseIntent {
+  id             String   @id @default(cuid())
+  userId         String
+  assetId        String
+  usdcAmount     Float
+  tokenAmount    Float
+  approvalTxHash String?
+  paymentTxHash  String?
+  mintTxHash     String?
+  status         String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id])
+  asset          Asset    @relation(fields: [assetId], references: [id])
+}
+
+model SaleIntent {
+  id               String   @id @default(cuid())
+  userId           String
+  assetId          String
+  tokenAmount      Float
+  usdcOut          Float
+  status           String
+  assetTokenTxHash String?
+  usdcPayoutTxHash String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id])
+  asset            Asset    @relation(fields: [assetId], references: [id])
+}
+
+model TransactionEvent {
+  id           String   @id @default(cuid())
+  chainId      String
+  txHash       String   @unique
+  blockNumber  Int?
+  eventType    String
+  wallet       String?
+  assetAddress String?
+  amount       String?
+  metadata     String?
+  createdAt    DateTime @default(now())
+}
+
+model YieldDistribution {
+  id             String      @id @default(cuid())
+  assetId        String
+  snapshotId     Int?
+  amountUsd      Float
+  txHash         String?
+  status         String
+  createdAt      DateTime    @default(now())
+  asset          Asset       @relation(fields: [assetId], references: [id])
+  claims         YieldClaim[]
+}
+
+model YieldClaim {
+  id               String            @id @default(cuid())
+  userId           String
+  distributionId   String
+  amountUsd        Float
+  txHash           String?
+  claimedAt        DateTime          @default(now())
+  user             User              @relation(fields: [userId], references: [id])
+  distribution     YieldDistribution @relation(fields: [distributionId], references: [id])
+}

@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+
+# Builds
+dist/
+dist-ssr/
+build/
+out/
+*.tsbuildinfo
+
+# Env & secrets (keep *.example)
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS & tooling
+.DS_Store
+.claude/
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Local DB
+*.db
+*.db-journal
+
+# Test / coverage
+coverage/
+coverage.json
+
+# Hardhat / Foundry (monarch-contracts)
+cache/
+artifacts/
+typechain/
+typechain-types/
+broadcast/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
