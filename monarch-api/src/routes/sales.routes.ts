@@ -12,6 +12,9 @@ import {
 } from "../services/blockchain.service.js";
 import { chainId, contracts } from "../services/contracts.js";
 
+/** Matches purchases / asset-creation float checks — avoids rejecting sells due to IEEE-754 noise on tranche totals. */
+const SUPPLY_EPS = 1e-9;
+
 const router = Router();
 
 router.get("/me", requireAuth, async (req, res, next) => {
@@ -143,19 +146,20 @@ router.post("/settle", requireAuth, async (req, res, next) => {
 
     // Return sold tokens back to available supply
     const assetRow = await prisma.asset.findUniqueOrThrow({ where: { id: sale.assetId } });
-    const newAvailable = assetRow.availableSupply + sale.tokenAmount;
+    const rawNext = assetRow.availableSupply + sale.tokenAmount;
 
-    // Validate we're not exceeding total tranche size
-    if (newAvailable > assetRow.tokensOffered) {
+    if (rawNext > assetRow.tokensOffered + SUPPLY_EPS) {
       throw new Error(
-        `Cannot return ${sale.tokenAmount} tokens: would result in ${newAvailable} available, ` +
+        `Cannot return ${sale.tokenAmount} tokens: would result in ${rawNext} available, ` +
         `but only ${assetRow.tokensOffered} tokens were offered in tranche`
       );
     }
 
+    const nextAvailable = Math.min(rawNext, assetRow.tokensOffered);
+
     await prisma.asset.update({
       where: { id: sale.assetId },
-      data: { availableSupply: newAvailable }
+      data: { availableSupply: nextAvailable }
     });
 
     res.json({ sale: updated, usdcPayoutTxHash: payoutTx });

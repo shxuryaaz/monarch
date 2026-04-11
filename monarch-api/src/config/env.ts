@@ -5,7 +5,10 @@ dotenv.config();
 
 const schema = z.object({
   PORT: z.coerce.number().default(4000),
-  DATABASE_URL: z.string().default("file:./dev.db"),
+  /** PostgreSQL only (see prisma/schema.prisma). Local: docker compose up -d in monarch-api */
+  DATABASE_URL: z
+    .string()
+    .default("postgresql://monarch:monarch@localhost:5432/monarch?schema=public"),
   JWT_SECRET: z.string().min(8),
   FRONTEND_ORIGIN: z.string().default("http://localhost:8080"),
   SIWE_DOMAIN: z.string().default("localhost"),

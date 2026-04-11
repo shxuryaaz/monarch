@@ -3,6 +3,9 @@ import { env } from "../config/env.js";
 import { contracts } from "./contracts.js";
 import deployed from "../../../monarch-contracts/deployed-addresses.json" with { type: "json" };
 
+/** Sepolia — fixed chain so JsonRpcProvider skips eth_chainId bootstrap (avoids startup timeouts on flaky RPC). */
+const SEPOLIA_CHAIN_ID = 11155111;
+
 const ERC20_IFACE = new ethers.Interface([
   "event Transfer(address indexed from, address indexed to, uint256 value)"
 ]);
@@ -44,7 +47,9 @@ export function isChainSettlementEnabled(): boolean {
 
 export function getProvider(): ethers.JsonRpcProvider {
   if (!env.SEPOLIA_RPC_URL) throw new Error("SEPOLIA_RPC_URL not configured");
-  return new ethers.JsonRpcProvider(env.SEPOLIA_RPC_URL);
+  return new ethers.JsonRpcProvider(env.SEPOLIA_RPC_URL, SEPOLIA_CHAIN_ID, {
+    staticNetwork: true
+  });
 }
 
 /** @deprecated Prefer getProvider / getRelayerWallet — used by tx-monitor heartbeat */

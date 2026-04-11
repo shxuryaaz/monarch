@@ -16,6 +16,7 @@ import { useWalletLiquidity } from "@/hooks/use-wallet-liquidity";
 import { assetImageAt } from "@/lib/asset-images";
 import { useToast } from "@/hooks/use-toast";
 import { wagmiConfig } from "@/lib/wagmi";
+import { tryAddSepoliaWithProjectRpc } from "@/lib/wallet-sepolia";
 import { CONTRACTS } from "@/lib/chain";
 import { clampUsd, computeInvestBounds, usdToUsdcBaseUnits } from "@/lib/invest-amount";
 import { tranchePctRemaining } from "@/lib/tranche";
@@ -140,6 +141,9 @@ const Marketplace = () => {
       setRitual({ open: true, phase: "open", name: assetName, tx: null, err: null });
 
       try {
+        if (chainSettlement) {
+          await tryAddSepoliaWithProjectRpc();
+        }
         await executePurchaseFlow({
           token,
           assetId: rawId,

@@ -169,6 +169,10 @@ export async function apiFetch<T>(
       }
     });
     if (!res.ok) {
+      if (res.status === 401 && token) {
+        localStorage.removeItem("monarch_jwt");
+        window.dispatchEvent(new CustomEvent("monarch-jwt-invalid"));
+      }
       const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string; code?: string };
       const msg =
         typeof body.error === "string"

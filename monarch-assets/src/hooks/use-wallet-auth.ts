@@ -84,6 +84,12 @@ export function useWalletAuth() {
   }, [address, isConnected, connectors, connectAsync, signInWithAddress]);
 
   useEffect(() => {
+    const onJwtInvalid = () => setToken(null);
+    window.addEventListener("monarch-jwt-invalid", onJwtInvalid);
+    return () => window.removeEventListener("monarch-jwt-invalid", onJwtInvalid);
+  }, []);
+
+  useEffect(() => {
     if (!isConnected || !address) {
       autoSignAttemptedRef.current = false;
       return;

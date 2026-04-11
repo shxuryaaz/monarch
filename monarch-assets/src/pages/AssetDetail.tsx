@@ -43,6 +43,7 @@ import { useAsset } from "@/hooks/use-asset";
 import { useWalletLiquidity } from "@/hooks/use-wallet-liquidity";
 import { useToast } from "@/hooks/use-toast";
 import { wagmiConfig } from "@/lib/wagmi";
+import { tryAddSepoliaWithProjectRpc } from "@/lib/wallet-sepolia";
 import { assetImageAt } from "@/lib/asset-images";
 import { useAssets } from "@/hooks/use-assets";
 import { usePortfolio } from "@/hooks/use-portfolio";
@@ -319,6 +320,9 @@ export default function AssetDetail() {
     setRitual({ open: true, phase: "open", name: assetName, tx: null, err: null });
 
     try {
+      if (chainSettlement) {
+        await tryAddSepoliaWithProjectRpc();
+      }
       await executePurchaseFlow({
         token,
         assetId,
