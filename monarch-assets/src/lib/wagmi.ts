@@ -1,13 +1,32 @@
-import { createConfig, http } from "wagmi";
+import { createConfig, fallback, http } from "wagmi";
 import { injected, metaMask } from "wagmi/connectors";
 import { mainnet, sepolia } from "wagmi/chains";
 
-/** Prefer Alchemy/Infura/Neon RPC — public Sepolia endpoints often rate-limit and viem will error. */
+/** Set in Vercel/CI — Alchemy/Infura HTTPS URL for Sepolia (baked in at build time). */
 const sepoliaRpc =
   typeof import.meta.env.VITE_SEPOLIA_RPC_URL === "string" &&
   import.meta.env.VITE_SEPOLIA_RPC_URL.length > 0
     ? import.meta.env.VITE_SEPOLIA_RPC_URL
     : undefined;
+
+/**
+ * Extra public endpoints so viem can rotate when one rate-limits ("RPC returned too many errors").
+ * Wallet **submission** still uses MetaMask’s Sepolia RPC — users may need to set that RPC in the wallet.
+ */
+const SEPOLIA_PUBLIC_FALLBACKS = [
+  "https://ethereum-sepolia-rpc.publicnode.com",
+  "https://rpc.sepolia.org"
+] as const;
+
+function sepoliaHttpTransport() {
+  const urls = [
+    ...(sepoliaRpc ? [sepoliaRpc] : []),
+    ...SEPOLIA_PUBLIC_FALLBACKS
+  ];
+  const transports = urls.map((url) => http(url));
+  if (transports.length === 1) return transports[0]!;
+  return fallback(transports);
+}
 
 /**
  * metaMask() uses @metamask/connect-evm so users can connect when `window.ethereum`
@@ -20,7 +39,7 @@ export const wagmiConfig = createConfig({
   chains: [sepolia, mainnet],
   connectors: [metaMask(), injected({ shimDisconnect: true })],
   transports: {
-    [sepolia.id]: http(sepoliaRpc),
+    [sepolia.id]: sepoliaHttpTransport(),
     [mainnet.id]: http()
   }
 });
