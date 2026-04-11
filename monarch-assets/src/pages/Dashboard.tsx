@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
-import { getMyListings, getMyPurchases, getMySales } from "@/lib/api";
+import { getMyListings, getMyPurchases, getMySales, getYieldHistory } from "@/lib/api";
 import { formatUsd } from "@/lib/utils";
 import { MarketPulseSection } from "@/components/MarketPulseSection";
 import { DashboardYieldSection } from "@/components/DashboardYieldSection";
@@ -228,7 +228,7 @@ function PerformanceChart({ samples, returnPct }: { samples: number[]; returnPct
 
 type ActivityRow = {
   key: string;
-  side: "buy" | "sell";
+  side: "buy" | "sell" | "yield";
   label: string;
   assetName: string;
   amountUsd: number;
@@ -266,15 +266,20 @@ function Transactions({ activities, loading }: { activities: ActivityRow[]; load
             const dateStr = date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
             const statusLabel = t.status.replace(/_/g, " ");
             const isSell = t.side === "sell";
+            const isYield = t.side === "yield";
             return (
               <div key={t.key} className="flex items-center justify-between px-6 py-4 transition-colors hover:bg-accent/50">
                 <div className="flex items-center gap-4">
                   <span
                     className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium ${
-                      isSell ? "bg-amber-500/15 text-amber-200" : "bg-foreground/10 text-foreground"
+                      isYield
+                        ? "bg-emerald-500/15 text-emerald-400"
+                        : isSell
+                        ? "bg-amber-500/15 text-amber-200"
+                        : "bg-foreground/10 text-foreground"
                     }`}
                   >
-                    {isSell ? "S" : "B"}
+                    {isYield ? "⚡" : isSell ? "S" : "B"}
                   </span>
                   <div>
                     <p className="text-sm font-medium text-foreground">{t.label}</p>
@@ -282,7 +287,9 @@ function Transactions({ activities, loading }: { activities: ActivityRow[]; load
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-medium text-foreground">{formatUsd(t.amountUsd)}</p>
+                  <p className={`text-sm font-medium ${isYield ? "text-emerald-400" : "text-foreground"}`}>
+                    {isYield ? "+" : ""}{formatUsd(t.amountUsd)}
+                  </p>
                   <p className="text-xs text-secondary-foreground">
                     {statusLabel} · {dateStr}
                   </p>
@@ -392,6 +399,13 @@ const Dashboard = () => {
     refetchInterval: POLL_INTERVAL_LISTINGS_MS
   });
 
+  const { data: yieldData } = useQuery({
+    queryKey: ["yield-history", token],
+    queryFn: () => getYieldHistory(token!),
+    enabled: !!token,
+    refetchInterval: 30_000
+  });
+
   // Store samples in state (not a ref) so PerformanceChart's useMemo([samples]) sees a new array
   // reference after each poll; mutating a ref in place left the same reference → chart never redrawed.
   const [valueSamples, setValueSamples] = useState<number[]>([]);
@@ -462,6 +476,7 @@ const Dashboard = () => {
   const tradingActivity = useMemo((): ActivityRow[] => {
     const purchases = purchaseData?.purchases ?? [];
     const sales = salesData?.sales ?? [];
+    const claims = yieldData?.dbClaims ?? [];
     const buyRows: ActivityRow[] = purchases.map((t) => ({
       key: `buy-${t.id}`,
       side: "buy",
@@ -480,10 +495,19 @@ const Dashboard = () => {
       status: t.status,
       createdAt: t.createdAt
     }));
-    return [...buyRows, ...sellRows]
+    const yieldRows: ActivityRow[] = claims.map((c) => ({
+      key: `yield-${c.id}`,
+      side: "yield",
+      label: "Yield",
+      assetName: c.distribution.asset.name,
+      amountUsd: c.amountUsd,
+      status: c.stellarTxHash ? "settled · Stellar ⚡" : "settled",
+      createdAt: c.claimedAt
+    }));
+    return [...buyRows, ...sellRows, ...yieldRows]
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 40);
-  }, [purchaseData?.purchases, salesData?.sales]);
+  }, [purchaseData?.purchases, salesData?.sales, yieldData?.dbClaims]);
 
   const activityLoading = purchasesLoading || salesLoading;
 

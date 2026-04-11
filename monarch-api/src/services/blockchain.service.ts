@@ -191,6 +191,18 @@ export async function relayerUsdcTransfer(to: string, amountBaseUnits: bigint): 
   return receipt?.hash ?? tx.hash;
 }
 
+/**
+ * Mint Mock USDC directly to a recipient. Relayer must hold MINTER_ROLE on MockUSDC.
+ * Used for yield payouts so holders receive USDC automatically without manual claiming.
+ */
+export async function relayerMintUsdc(to: string, amountBaseUnits: bigint): Promise<string> {
+  const signer = getRelayerWallet();
+  const c = new ethers.Contract(contracts.MockUSDC, ERC20_ABI, signer);
+  const tx = await c.mint(to, amountBaseUnits);
+  const receipt = await tx.wait();
+  return receipt?.hash ?? tx.hash;
+}
+
 const MILESTONE_ESCROW_ACTION_ABI = [
   "function releaseMilestone(address assetToken, uint256 index, bytes32 proofHash) external"
 ];

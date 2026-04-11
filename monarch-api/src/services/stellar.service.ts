@@ -65,6 +65,62 @@ export async function ensureAccountFunded(publicKey: string): Promise<void> {
 }
 
 /**
+ * Testnet USDC on Stellar — issued by Circle's testnet account.
+ * On mainnet: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5 (same issuer).
+ */
+const TESTNET_USDC_ISSUER = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
+const STELLAR_USDC = new Asset("USDC", TESTNET_USDC_ISSUER);
+
+/**
+ * Check whether a Stellar account has a USDC trustline.
+ * Returns false if the account doesn't exist yet or has no USDC balance line.
+ */
+export async function hasStellarUsdcTrustline(publicKey: string): Promise<boolean> {
+  const server = getServer();
+  try {
+    const account = await server.loadAccount(publicKey);
+    return account.balances.some(
+      (b: { asset_type: string; asset_code?: string; asset_issuer?: string }) =>
+        b.asset_type === "credit_alphanum4" &&
+        b.asset_code === "USDC" &&
+        b.asset_issuer === TESTNET_USDC_ISSUER
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Send USDC on Stellar from the relayer to a recipient.
+ * Recipient must have a USDC trustline — call hasStellarUsdcTrustline first.
+ * Falls back gracefully: callers should catch and retry with stellarXlmTransfer.
+ */
+export async function stellarUsdcTransfer(toPublicKey: string, amountUsdc: string): Promise<string> {
+  const server = getServer();
+  const relayer = getStellarRelayer();
+
+  const account = await server.loadAccount(relayer.publicKey());
+  const tx = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE
+  })
+    .addOperation(
+      Operation.payment({
+        destination: toPublicKey,
+        asset: STELLAR_USDC,
+        amount: amountUsdc
+      })
+    )
+    .setTimeout(30)
+    .build();
+
+  tx.sign(relayer);
+
+  const result = await server.submitTransaction(tx);
+  return result.hash;
+}
+
+/**
  * Verify a Stellar XLM payment from a user to the relayer.
  * Checks the transaction on Horizon by hash and validates sender/recipient/amount.
  */

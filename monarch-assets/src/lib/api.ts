@@ -145,6 +145,7 @@ export type YieldHistoryResponse = {
     amountUsd: number;
     claimedAt: string;
     txHash?: string | null;
+    stellarTxHash?: string | null;
     distribution: {
       id: string;
       amountUsd: number;
@@ -174,6 +175,14 @@ export async function distributeYield(token: string, assetId: string, amountUsd:
     { method: "POST", body: JSON.stringify({ assetId, amountUsd }) },
     token
   );
+}
+
+export async function getStellarStatus(token: string) {
+  return apiFetch<{
+    hasTrustline: boolean;
+    trustlineSetupUrl: string | null;
+    usdcIssuer?: string;
+  }>("/users/me/stellar-status", undefined, token);
 }
 
 export async function getMe(token: string) {

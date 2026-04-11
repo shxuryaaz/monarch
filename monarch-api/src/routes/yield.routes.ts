@@ -7,10 +7,17 @@ import { requireAuth } from "../middleware/auth.js";
 import {
   getProvider,
   isChainSettlementEnabled,
-  relayerDistributeYield
+  relayerDistributeYield,
+  relayerMintUsdc,
+  usdcBaseUnitsFromUsd
 } from "../services/blockchain.service.js";
 import { contracts } from "../services/contracts.js";
-import { isStellarEnabled, stellarXlmTransfer, ensureAccountFunded } from "../services/stellar.service.js";
+import {
+  isStellarEnabled,
+  stellarXlmTransfer,
+  stellarUsdcTransfer,
+  ensureAccountFunded
+} from "../services/stellar.service.js";
 
 const router = Router();
 
@@ -153,29 +160,58 @@ router.post("/distribute", requireAuth, async (req, res, next) => {
       }
     }
 
-    // --- Stellar XLM yield payouts ---
-    // For every holder who has registered a Stellar address, send their pro-rata
-    // share as XLM via Stellar. Stellar settles in ~5 seconds at $0.00001/tx.
-    let stellarTxHash: string | undefined;
-    if (isStellarEnabled()) {
-      try {
-        const positions = await prisma.portfolioPosition.findMany({
-          where: { assetId: body.assetId, tokenBalance: { gt: 0 } },
-          include: { user: { select: { stellarPublicKey: true } } }
-        });
+    // --- Load all holders for pro-rata payouts ---
+    const positions = await prisma.portfolioPosition.findMany({
+      where: { assetId: body.assetId, tokenBalance: { gt: 0 } },
+      include: { user: { select: { id: true, wallet: true, stellarPublicKey: true } } }
+    });
+    const totalTokens = positions.reduce((sum, p) => sum + p.tokenBalance, 0);
 
-        const totalTokens = positions.reduce((sum, p) => sum + p.tokenBalance, 0);
-
-        for (const pos of positions) {
-          if (!pos.user.stellarPublicKey) continue;
+    // --- Mock USDC payouts — mint pro-rata USDC directly to each holder's wallet ---
+    // Relayer must hold MINTER_ROLE on MockUSDC (true for the demo deploy).
+    // Best-effort: a failure here does not abort the distribution record.
+    const claimTxHashes: Record<string, string> = {};
+    if (isChainSettlementEnabled() && totalTokens > 0) {
+      for (const pos of positions) {
+        try {
           const shareUsd = (pos.tokenBalance / totalTokens) * body.amountUsd;
-          // 1 XLM ≈ $0.10 on testnet — scale so the demo shows a meaningful amount
-          const amountXlm = Math.max(shareUsd, 0.0000001).toFixed(7);
-          await ensureAccountFunded(pos.user.stellarPublicKey);
-          stellarTxHash = await stellarXlmTransfer(pos.user.stellarPublicKey, amountXlm);
+          const shareBaseUnits = usdcBaseUnitsFromUsd(shareUsd);
+          if (shareBaseUnits > 0n) {
+            const claimTxHash = await relayerMintUsdc(pos.user.wallet, shareBaseUnits);
+            claimTxHashes[pos.user.id] = claimTxHash;
+          }
+        } catch {
+          // Best-effort — one holder failure does not block the rest
         }
-      } catch {
-        // Stellar payout is best-effort — never fail the main distribution
+      }
+    }
+
+    // --- Stellar payouts — USDC on Stellar (with XLM fallback) ---
+    // For holders with a registered Stellar address, pay their pro-rata share via Stellar.
+    // Tries Stellar USDC first (Circle-issued, same USDC as Ethereum).
+    // Falls back to XLM if the recipient has no USDC trustline set up yet.
+    let stellarTxHash: string | undefined;
+    const stellarClaimTxHashes: Record<string, string> = {};
+    if (isStellarEnabled() && totalTokens > 0) {
+      for (const pos of positions) {
+        if (!pos.user.stellarPublicKey) continue;
+        try {
+          const shareUsd = (pos.tokenBalance / totalTokens) * body.amountUsd;
+          const amountStr = Math.max(shareUsd, 0.0000001).toFixed(7);
+          await ensureAccountFunded(pos.user.stellarPublicKey);
+          let txHash: string;
+          try {
+            // Try USDC on Stellar first
+            txHash = await stellarUsdcTransfer(pos.user.stellarPublicKey, amountStr);
+          } catch {
+            // Recipient has no USDC trustline — fall back to XLM
+            txHash = await stellarXlmTransfer(pos.user.stellarPublicKey, amountStr);
+          }
+          stellarClaimTxHashes[pos.user.id] = txHash;
+          stellarTxHash = txHash; // last one stored on the distribution record
+        } catch {
+          // Best-effort per holder — never fail the distribution
+        }
       }
     }
 
@@ -189,6 +225,24 @@ router.post("/distribute", requireAuth, async (req, res, next) => {
         stellarTxHash: stellarTxHash ?? null
       }
     });
+
+    // Auto-create YieldClaim records for each holder — stores both USDC tx and Stellar tx
+    if (totalTokens > 0) {
+      await Promise.all(
+        positions.map((pos) => {
+          const shareUsd = (pos.tokenBalance / totalTokens) * body.amountUsd;
+          return prisma.yieldClaim.create({
+            data: {
+              userId: pos.user.id,
+              distributionId: dist.id,
+              amountUsd: Number(shareUsd.toFixed(2)),
+              txHash: claimTxHashes[pos.user.id] ?? null,       // Ethereum USDC tx
+              stellarTxHash: stellarClaimTxHashes[pos.user.id] ?? null  // Stellar USDC/XLM tx
+            }
+          });
+        })
+      );
+    }
 
     res.status(201).json(dist);
   } catch (error) {

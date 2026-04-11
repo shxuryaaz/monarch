@@ -200,6 +200,7 @@ model YieldClaim {
   distributionId   String
   amountUsd        Float
   txHash           String?
+  stellarTxHash    String?
   claimedAt        DateTime          @default(now())
   user             User              @relation(fields: [userId], references: [id])
   distribution     YieldDistribution @relation(fields: [distributionId], references: [id])
