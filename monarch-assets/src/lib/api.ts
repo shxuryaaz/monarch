@@ -135,6 +135,8 @@ export type YieldHistoryResponse = {
     amountUsd: number;
     status: string;
     txHash?: string | null;
+    /** Stellar transaction hash — present when yield was also paid via Stellar XLM */
+    stellarTxHash?: string | null;
     createdAt: string;
     asset: { id: string; name: string; tokenAddress: string };
   }>;
@@ -156,6 +158,30 @@ export type YieldHistoryResponse = {
 
 export async function getYieldHistory(token: string) {
   return apiFetch<YieldHistoryResponse>("/yield/history", undefined, token);
+}
+
+export async function setStellarPublicKey(token: string, stellarPublicKey: string | null) {
+  return apiFetch<{ user: { id: string; wallet: string; stellarPublicKey: string | null } }>(
+    "/users/me/stellar",
+    { method: "PATCH", body: JSON.stringify({ stellarPublicKey }) },
+    token
+  );
+}
+
+export async function distributeYield(token: string, assetId: string, amountUsd: number) {
+  return apiFetch<{ id: string; assetId: string; amountUsd: number; status: string; stellarTxHash: string | null }>(
+    "/yield/distribute",
+    { method: "POST", body: JSON.stringify({ assetId, amountUsd }) },
+    token
+  );
+}
+
+export async function getMe(token: string) {
+  return apiFetch<{ user: { id: string; wallet: string; stellarPublicKey: string | null; isAdmin: boolean } }>(
+    "/users/me",
+    undefined,
+    token
+  );
 }
 
 export async function apiFetch<T>(

@@ -12,6 +12,7 @@ import purchasesRoutes from "./routes/purchases.routes.js";
 import salesRoutes from "./routes/sales.routes.js";
 import yieldRoutes from "./routes/yield.routes.js";
 import listingsRoutes from "./routes/listings.routes.js";
+import usersRoutes from "./routes/users.routes.js";
 
 export const app = express();
 
@@ -50,5 +51,6 @@ app.use("/purchases", purchasesRoutes);
 app.use("/sales", salesRoutes);
 app.use("/yield", yieldRoutes);
 app.use("/listings", listingsRoutes);
+app.use("/users", usersRoutes);
 
 app.use(errorHandler);

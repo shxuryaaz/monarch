@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, ArrowUpRight, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
-import { createListing, getMyListings, type AssetListingRow } from "@/lib/api";
+import { createListing, getMyListings, distributeYield, type AssetListingRow } from "@/lib/api";
+import { formatUsd } from "@/lib/utils";
 import { useWalletAuth } from "@/hooks/use-wallet-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,80 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ParticipantAcknowledgment } from "@/components/ParticipantAcknowledgment";
 import { formatTrancheLeftLabel, tranchePctRemaining } from "@/lib/tranche";
+
+function DistributeYieldInline({ assetId, token, suggestedAmount }: {
+  assetId: string;
+  token: string;
+  suggestedAmount: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: (amountUsd: number) => distributeYield(token, assetId, amountUsd),
+    onSuccess: (dist) => {
+      const stellar = dist.stellarTxHash ? " ⚡ Stellar payout sent!" : "";
+      setMsg({ text: `Distributed!${stellar}`, ok: true });
+      setAmount("");
+      setTimeout(() => { setMsg(null); setOpen(false); }, 4000);
+    },
+    onError: (e) => setMsg({ text: e instanceof Error ? e.message : "Failed", ok: false })
+  });
+
+  const handleSend = () => {
+    const amt = parseFloat(amount) || suggestedAmount;
+    if (amt <= 0) return;
+    setMsg(null);
+    mutation.mutate(amt);
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+      >
+        Distribute yield →
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground">
+        Suggested: {formatUsd(suggestedAmount)}/mo · based on {((suggestedAmount * 12) / 100).toFixed(1)}% APY
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        <input
+          type="number"
+          min="0.01"
+          step="0.01"
+          value={amount}
+          onChange={(e) => { setAmount(e.target.value); setMsg(null); }}
+          placeholder={suggestedAmount.toFixed(2)}
+          className="h-7 w-28 rounded border border-border bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+        <button
+          onClick={handleSend}
+          disabled={mutation.isPending}
+          className="h-7 rounded bg-foreground px-3 text-xs font-medium text-background disabled:opacity-50"
+        >
+          {mutation.isPending ? "Sending…" : "Send"}
+        </button>
+        <button
+          onClick={() => { setOpen(false); setMsg(null); setAmount(""); }}
+          className="h-7 text-xs text-muted-foreground hover:text-foreground"
+        >
+          Cancel
+        </button>
+      </div>
+      {msg && (
+        <p className={`text-xs ${msg.ok ? "text-emerald-400" : "text-red-400"}`}>{msg.text}</p>
+      )}
+    </div>
+  );
+}
 
 const steps = ["Basics", "Economics", "Review"] as const;
 
@@ -207,7 +282,7 @@ export default function ListAsset() {
                             </div>
                           ) : null}
                         </dl>
-                        <div className="mt-auto pt-5">
+                        <div className="mt-auto pt-5 space-y-3">
                           {L.createdAssetId ? (
                             <Link
                               to={`/marketplace/${L.createdAssetId}`}
@@ -221,6 +296,15 @@ export default function ListAsset() {
                               No marketplace link until published
                             </p>
                           )}
+                          {L.createdAssetId && token ? (
+                            <div className="border-t border-border/60 pt-3">
+                              <DistributeYieldInline
+                                assetId={L.createdAssetId}
+                                token={token}
+                                suggestedAmount={(L.totalAssetValue * (L.expectedYieldPct / 100)) / 12}
+                              />
+                            </div>
+                          ) : null}
                         </div>
                       </li>
                     );

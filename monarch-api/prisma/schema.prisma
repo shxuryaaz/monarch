@@ -8,13 +8,15 @@ datasource db {
 }
 
 model User {
-  id            String               @id @default(cuid())
-  wallet        String               @unique
-  createdAt     DateTime             @default(now())
-  lastLogin     DateTime?
-  isAdmin       Boolean              @default(false)
+  id               String               @id @default(cuid())
+  wallet           String               @unique
+  /** Optional Stellar public key (G...) — used for XLM yield payouts via Stellar network */
+  stellarPublicKey String?              @unique
+  createdAt        DateTime             @default(now())
+  lastLogin        DateTime?
+  isAdmin          Boolean              @default(false)
   /** NOT_STARTED | PENDING | APPROVED | REJECTED — gate listings when KYC_MODE=strict */
-  kycStatus     String               @default("APPROVED")
+  kycStatus        String               @default("APPROVED")
   nonces        AuthNonce[]
   positions     PortfolioPosition[]
   snapshots     PortfolioSnapshot[]
@@ -184,6 +186,8 @@ model YieldDistribution {
   snapshotId     Int?
   amountUsd      Float
   txHash         String?
+  /** Stellar transaction hash when yield was also paid via Stellar XLM */
+  stellarTxHash  String?
   status         String
   createdAt      DateTime    @default(now())
   asset          Asset       @relation(fields: [assetId], references: [id])

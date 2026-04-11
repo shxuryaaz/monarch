@@ -29,6 +29,10 @@ const schema = z.object({
   PRIMARY_ISSUER_ADDRESS: z.string().optional(),
   /** Optional MilestoneEscrow; overrides contracts JSON if both set */
   MILESTONE_ESCROW_ADDRESS: z.string().optional(),
+  /** Stellar relayer secret key (S...) — enables XLM yield payouts via Stellar */
+  STELLAR_SECRET_KEY: z.string().optional(),
+  /** Stellar relayer public key (G...) — shown to users for payment instructions */
+  STELLAR_PUBLIC_KEY: z.string().optional(),
   /** stub: allow all listings; strict: submitter must have User.kycStatus APPROVED */
   KYC_MODE: z.enum(["stub", "strict"]).default("stub"),
   /**
