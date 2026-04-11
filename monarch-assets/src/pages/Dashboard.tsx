@@ -369,24 +369,27 @@ const Dashboard = () => {
     isSuccess: portfolioSuccess,
     dataUpdatedAt: portfolioUpdatedAt
   } = usePortfolio(token ?? undefined);
+  /** Wait for portfolio 200 before other /me calls so a bad JWT only produces one 401, not four. */
+  const authedQueriesReady = !!token && portfolioSuccess;
+
   const { data: purchaseData, isLoading: purchasesLoading } = useQuery({
     queryKey: ["purchases", token],
     queryFn: () => getMyPurchases(token!),
-    enabled: !!token,
+    enabled: authedQueriesReady,
     refetchInterval: 15_000
   });
 
   const { data: salesData, isLoading: salesLoading } = useQuery({
     queryKey: ["sales", token],
     queryFn: () => getMySales(token!),
-    enabled: !!token,
+    enabled: authedQueriesReady,
     refetchInterval: 15_000
   });
 
   const { data: listingsData } = useQuery({
     queryKey: ["listings-me", token],
     queryFn: () => getMyListings(token!),
-    enabled: !!token,
+    enabled: authedQueriesReady,
     refetchInterval: 30_000
   });
 
@@ -490,6 +493,7 @@ const Dashboard = () => {
   const totalReturns = portfolio?.totalReturns ?? 0;
   const positions = portfolio?.positions ?? [];
   const samples = valueSamples;
+  const tokenForAuthedApis = authedQueriesReady && token ? token : "";
 
   if (!token) {
     return (
@@ -555,9 +559,9 @@ const Dashboard = () => {
               <div className="space-y-6">
                 <MarketPulseSection />
                 <PerformanceChart samples={samples} returnPct={returnPct} />
-                <DashboardYieldSection authToken={token} />
-                <OnchainYieldClaims authToken={token} />
-                <AssetHoldingsWithSell positions={positions} authToken={token} />
+                <DashboardYieldSection authToken={tokenForAuthedApis} />
+                <OnchainYieldClaims authToken={tokenForAuthedApis} />
+                <AssetHoldingsWithSell positions={positions} authToken={tokenForAuthedApis} />
                 <Transactions activities={tradingActivity} loading={activityLoading} />
               </div>
               <RightPanel allocation={allocation} riskLabel={riskLabel} riskScore={riskScore} />

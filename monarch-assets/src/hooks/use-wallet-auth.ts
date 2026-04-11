@@ -2,18 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ProviderNotFoundError, useAccount, useConnect, useDisconnect, useSignMessage } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { apiFetch } from "@/lib/api";
+import { getValidStoredJwt, TOKEN_KEY } from "@/lib/jwt-storage";
 
 const NO_WALLET_HELP =
   "No Ethereum wallet is available in this browser. Install MetaMask (or another Web3 wallet). If you use Incognito/private mode, allow the wallet extension for this site or use a normal window—extensions are often blocked there.";
-
-const TOKEN_KEY = "monarch_jwt";
 
 export function useWalletAuth() {
   const { address, isConnected } = useAccount();
   const { connectAsync, connectors, isPending: isConnectPending } = useConnect();
   const { disconnect } = useDisconnect();
   const { signMessageAsync, isPending: isSignPending } = useSignMessage();
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
+  const [token, setToken] = useState<string | null>(() => getValidStoredJwt());
   const [authLoading, setAuthLoading] = useState(false);
   const autoSignAttemptedRef = useRef(false);
 
