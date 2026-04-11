@@ -28,6 +28,10 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+app.get("/ping", (_req, res) => {
+  res.json({ pong: true, ts: Date.now() });
+});
+
 app.get("/config", (_req, res) => {
   const secondaryTreasury = getSecondaryTreasuryAddress();
   res.json({
