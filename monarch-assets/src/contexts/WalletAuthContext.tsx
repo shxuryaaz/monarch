@@ -10,7 +10,8 @@ import {
 } from "react";
 import { ProviderNotFoundError, useAccount, useConnect, useDisconnect, useSignMessage } from "wagmi";
 import { sepolia } from "wagmi/chains";
-import { apiFetch } from "@/lib/api";
+import { useNavigate } from "react-router-dom";
+import { apiFetch, getKycStatus } from "@/lib/api";
 import {
   MONARCH_JWT_INVALID_EVENT,
   MONARCH_JWT_STORAGE_KEY
@@ -40,6 +41,7 @@ export function WalletAuthProvider({ children }: { children: ReactNode }) {
   const { connectAsync, connectors, isPending: isConnectPending } = useConnect();
   const { disconnect } = useDisconnect();
   const { signMessageAsync, isPending: isSignPending } = useSignMessage();
+  const navigate = useNavigate();
   const [token, setToken] = useState<string | null>(() =>
     localStorage.getItem(MONARCH_JWT_STORAGE_KEY)
   );
@@ -47,7 +49,7 @@ export function WalletAuthProvider({ children }: { children: ReactNode }) {
   const autoSignAttemptedRef = useRef(false);
 
   const signInWithAddress = useCallback(
-    async (walletAddress: `0x${string}`) => {
+    async (walletAddress: `0x${string}`, redirectIfKycRequired = false) => {
       const challenge = await apiFetch<{ message: string }>("/auth/challenge", {
         method: "POST",
         body: JSON.stringify({ wallet: walletAddress })
@@ -62,8 +64,19 @@ export function WalletAuthProvider({ children }: { children: ReactNode }) {
       });
       localStorage.setItem(MONARCH_JWT_STORAGE_KEY, verified.token);
       setToken(verified.token);
+
+      if (redirectIfKycRequired) {
+        try {
+          const { kycStatus } = await getKycStatus(verified.token);
+          if (kycStatus === "NOT_STARTED") {
+            navigate("/kyc");
+          }
+        } catch {
+          // Non-fatal: silently ignore KYC status fetch errors
+        }
+      }
     },
-    [signMessageAsync]
+    [signMessageAsync, navigate]
   );
 
   const connectAndSignIn = useCallback(async () => {
@@ -106,7 +119,7 @@ export function WalletAuthProvider({ children }: { children: ReactNode }) {
         walletAddress = (typeof first === "string" ? first : first.address) as `0x${string}`;
       }
       if (!walletAddress) throw new Error("No account from wallet");
-      await signInWithAddress(walletAddress);
+      await signInWithAddress(walletAddress, true);
     } finally {
       setAuthLoading(false);
     }

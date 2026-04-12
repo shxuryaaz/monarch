@@ -15,15 +15,31 @@ model User {
   createdAt        DateTime             @default(now())
   lastLogin        DateTime?
   isAdmin          Boolean              @default(false)
-  /** NOT_STARTED | PENDING | APPROVED | REJECTED — gate listings when KYC_MODE=strict */
-  kycStatus        String               @default("APPROVED")
-  nonces        AuthNonce[]
-  positions     PortfolioPosition[]
-  snapshots     PortfolioSnapshot[]
-  purchases     PurchaseIntent[]
-  sales         SaleIntent[]
-  claims        YieldClaim[]
-  assetListings AssetListing[]
+  /** NOT_STARTED | PENDING | APPROVED | REJECTED */
+  kycStatus        String               @default("NOT_STARTED")
+  nonces           AuthNonce[]
+  positions        PortfolioPosition[]
+  snapshots        PortfolioSnapshot[]
+  purchases        PurchaseIntent[]
+  sales            SaleIntent[]
+  claims           YieldClaim[]
+  assetListings    AssetListing[]
+  kycSubmission    KYCSubmission?
+}
+
+model KYCSubmission {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  fullName    String
+  dateOfBirth String
+  country     String
+  address     String
+  idFrontPath String
+  idBackPath  String
+  selfiePath  String
+  submittedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model AuthNonce {

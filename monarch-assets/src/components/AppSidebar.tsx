@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   ListPlus,
   LogOut,
+  ShieldCheck,
   Store,
   Wallet
 } from "lucide-react";
@@ -24,6 +25,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { useWalletAuth } from "@/hooks/use-wallet-auth";
+import { useKycStatus } from "@/hooks/use-kyc-status";
 import { useWalletLiquidity } from "@/hooks/use-wallet-liquidity";
 import { useToast } from "@/hooks/use-toast";
 import { wagmiConfig } from "@/lib/wagmi";
@@ -56,6 +58,7 @@ export function SidebarNav({ onNavigate, collapsed = false, onToggleCollapsed }:
   const isMobileSheet = Boolean(onNavigate);
   const rail = !isMobileSheet && collapsed;
   const { token, shortAddress, connectAndSignIn, logout, isPending } = useWalletAuth();
+  const { kycStatus } = useKycStatus();
   const { toast } = useToast();
   const chainId = useChainId();
   const { ethFormatted, usdcFormatted, refetchAll } = useWalletLiquidity();
@@ -215,6 +218,51 @@ export function SidebarNav({ onNavigate, collapsed = false, onToggleCollapsed }:
           >
             <ListPlus className="h-4 w-4 shrink-0 opacity-80" strokeWidth={1.75} />
             {!rail ? "List an asset" : null}
+          </NavLink>
+        ) : null}
+        {token ? (
+          <NavLink
+            to="/kyc"
+            onClick={onNavigate}
+            title={rail ? "KYC Verification" : undefined}
+            className={({ isActive }) => navItemClass(isActive)}
+          >
+            <ShieldCheck
+              className={cn(
+                "h-4 w-4 shrink-0",
+                kycStatus === "APPROVED"
+                  ? "text-green-500 opacity-100"
+                  : kycStatus === "REJECTED"
+                    ? "text-red-500 opacity-100"
+                    : "opacity-80"
+              )}
+              strokeWidth={1.75}
+            />
+            {!rail ? (
+              <span className="flex flex-1 items-center justify-between">
+                KYC
+                <span
+                  className={cn(
+                    "ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
+                    kycStatus === "APPROVED"
+                      ? "bg-green-500/15 text-green-600"
+                      : kycStatus === "REJECTED"
+                        ? "bg-red-500/15 text-red-600"
+                        : kycStatus === "PENDING"
+                          ? "bg-yellow-500/15 text-yellow-600"
+                          : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {kycStatus === "APPROVED"
+                    ? "Verified"
+                    : kycStatus === "REJECTED"
+                      ? "Rejected"
+                      : kycStatus === "PENDING"
+                        ? "Pending"
+                        : "Required"}
+                </span>
+              </span>
+            ) : null}
           </NavLink>
         ) : null}
       </nav>

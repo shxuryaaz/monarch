@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, ArrowUpRight, MapPin } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ArrowLeft, ArrowRight, ArrowUpRight, MapPin, ShieldCheck } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { createListing, getMyListings, distributeYield, type AssetListingRow } from "@/lib/api";
 import { formatUsd } from "@/lib/utils";
 import { useWalletAuth } from "@/hooks/use-wallet-auth";
+import { useKycStatus } from "@/hooks/use-kyc-status";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,6 +103,8 @@ function listingStatusTone(L: AssetListingRow): "live" | "pending" {
 
 export default function ListAsset() {
   const { token } = useWalletAuth();
+  const { kycStatus } = useKycStatus();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [step, setStep] = useState(0);
@@ -208,7 +211,22 @@ export default function ListAsset() {
             auto-publish is disabled). Use real economics and documentation you are willing to stand behind.
           </p>
 
-          {token ? (
+          {token && kycStatus !== "APPROVED" ? (
+            <div className="mt-10 flex flex-col items-center justify-center rounded-xl border border-border bg-muted/30 py-16 text-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-yellow-500/10">
+                <ShieldCheck className="h-7 w-7 text-yellow-500" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">KYC required to list an asset</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Complete your identity verification to unlock asset listing.
+                </p>
+              </div>
+              <Button onClick={() => navigate("/kyc")}>
+                Verify Identity <ShieldCheck className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          ) : token ? (
             <section className="mt-10">
               <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-4">
                 <div>
@@ -314,7 +332,7 @@ export default function ListAsset() {
             </section>
           ) : null}
 
-          <div className="mx-auto mt-14 max-w-2xl">
+          {(!token || kycStatus === "APPROVED") && <div className="mx-auto mt-14 max-w-2xl">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">New offering</p>
             <div className="mt-3 flex gap-2 border-b border-border pb-4">
             {steps.map((s, i) => (
@@ -439,7 +457,7 @@ export default function ListAsset() {
                 Sign in with your wallet from the sidebar.
               </p>
             ) : null}
-          </div>
+          </div>}
         </motion.div>
       </div>
     </div>

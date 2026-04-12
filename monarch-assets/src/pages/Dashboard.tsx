@@ -8,6 +8,7 @@ import { MarketPulseSection } from "@/components/MarketPulseSection";
 import { DashboardYieldSection } from "@/components/DashboardYieldSection";
 import { AssetHoldingsWithSell, OnchainYieldClaims } from "@/components/DashboardOnchainPanels";
 import { useWalletAuth } from "@/hooks/use-wallet-auth";
+import { useKycStatus } from "@/hooks/use-kyc-status";
 import { usePortfolio } from "@/hooks/use-portfolio";
 
 const POLL_INTERVAL_PURCHASES_MS = 15_000;
@@ -365,6 +366,7 @@ function RightPanel({
 
 const Dashboard = () => {
   const { token, shortAddress } = useWalletAuth();
+  const { kycStatus } = useKycStatus();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -534,6 +536,20 @@ const Dashboard = () => {
           returnPct={returnPct}
           wallet={shortAddress}
         />
+        {kycStatus === "NOT_STARTED" && (
+          <div
+            className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 cursor-pointer"
+            onClick={() => navigate("/kyc")}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-yellow-500 text-lg">⚠</span>
+              <div>
+                <p className="text-sm font-medium text-foreground">Complete KYC verification to unlock investing and asset listing.</p>
+              </div>
+            </div>
+            <span className="shrink-0 text-sm font-medium text-yellow-600 hover:underline">Verify Now →</span>
+          </div>
+        )}
 
         {(listingsData?.listings?.length ?? 0) > 0 ? (
           <motion.div

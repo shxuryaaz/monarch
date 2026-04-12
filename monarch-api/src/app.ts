@@ -13,6 +13,7 @@ import salesRoutes from "./routes/sales.routes.js";
 import yieldRoutes from "./routes/yield.routes.js";
 import listingsRoutes from "./routes/listings.routes.js";
 import usersRoutes from "./routes/users.routes.js";
+import kycRoutes from "./routes/kyc.routes.js";
 
 export const app = express();
 
@@ -56,5 +57,6 @@ app.use("/sales", salesRoutes);
 app.use("/yield", yieldRoutes);
 app.use("/listings", listingsRoutes);
 app.use("/users", usersRoutes);
+app.use("/kyc", kycRoutes);
 
 app.use(errorHandler);

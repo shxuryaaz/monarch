@@ -40,6 +40,7 @@ import { formatUsd } from "@/lib/utils";
 import { executePurchaseFlow, type RitualPhase } from "@/lib/invest-flow";
 import type { SellRitualPhase, SellRitualPhasePayload } from "@/lib/sell-flow";
 import { useWalletAuth } from "@/hooks/use-wallet-auth";
+import { useKycStatus } from "@/hooks/use-kyc-status";
 import { useAsset } from "@/hooks/use-asset";
 import { useWalletLiquidity } from "@/hooks/use-wallet-liquidity";
 import { useToast } from "@/hooks/use-toast";
@@ -126,6 +127,7 @@ export default function AssetDetail() {
   const { assetId } = useParams<{ assetId: string }>();
   const navigate = useNavigate();
   const { token } = useWalletAuth();
+  const { kycStatus } = useKycStatus();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const chainId = useChainId();
@@ -277,6 +279,16 @@ export default function AssetDetail() {
       return;
     }
     if (investingId) return;
+
+    if (kycStatus !== "APPROVED") {
+      toast({
+        title: "KYC required",
+        description: "Complete your identity verification before investing.",
+        variant: "destructive"
+      });
+      navigate("/kyc");
+      return;
+    }
 
     if (!participantAck) {
       toast({

@@ -12,6 +12,7 @@ import {
 } from "../services/blockchain.service.js";
 import { chainId, contracts } from "../services/contracts.js";
 import { getPrimaryUsdcRecipient } from "../services/purchase-recipient.service.js";
+import { assertUserKyc } from "../services/kyc.service.js";
 
 /** Floating-point epsilon for token supply comparisons (avoids rejecting due to float rounding). */
 const SUPPLY_FLOAT_EPSILON = 1e-9;
@@ -34,6 +35,7 @@ router.get("/me", requireAuth, async (req, res, next) => {
 
 router.post("/intent", requireAuth, async (req, res, next) => {
   try {
+    await assertUserKyc(req.user!.sub);
     const body = z.object({ assetId: z.string(), usdcAmount: z.number().positive() }).parse(req.body);
     const asset = await prisma.asset.findUniqueOrThrow({ where: { id: body.assetId } });
     const refUsd = asset.oraclePriceUsd ?? asset.tokenPriceUsd;

@@ -34,7 +34,9 @@ const schema = z.object({
   /** Stellar relayer public key (G...) — shown to users for payment instructions */
   STELLAR_PUBLIC_KEY: z.string().optional(),
   /** stub: allow all listings; strict: submitter must have User.kycStatus APPROVED */
-  KYC_MODE: z.enum(["stub", "strict"]).default("stub"),
+  KYC_MODE: z.enum(["stub", "strict"]).default("strict"),
+  /** Directory for multer KYC document uploads (default: ./uploads) */
+  UPLOADS_DIR: z.string().default("./uploads"),
   /**
    * When true (default), POST /listings also creates the marketplace asset so it appears immediately.
    * Set LISTINGS_AUTO_PUBLISH=false to require POST /admin/listings/:id/approve.

@@ -398,3 +398,35 @@ export type SaleIntentRow = {
 export async function getMySales(token: string) {
   return apiFetch<{ sales: SaleIntentRow[] }>("/sales/me", undefined, token);
 }
+
+export type KYCStatus = "NOT_STARTED" | "PENDING" | "APPROVED" | "REJECTED";
+
+export type KYCSubmission = {
+  fullName: string;
+  dateOfBirth: string;
+  country: string;
+  address: string;
+  submittedAt: string;
+};
+
+export async function getKycStatus(token: string) {
+  return apiFetch<{ kycStatus: KYCStatus; submission: KYCSubmission | null }>(
+    "/kyc/status",
+    undefined,
+    token
+  );
+}
+
+export async function submitKyc(token: string, formData: FormData) {
+  const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000").replace(/\/+$/, "");
+  const res = await fetch(`${API_BASE}/kyc/submit`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+    throw new ApiError(body.error ?? `Request failed: ${res.status}`, res.status, body.code);
+  }
+  return (await res.json()) as { kycStatus: KYCStatus; message: string };
+}
